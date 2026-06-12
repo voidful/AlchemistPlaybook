@@ -1,0 +1,36 @@
+# Full-parameter DPO (TRL / alignment-handbook style)
+# Anchor recipe: Zephyr-7B DPO [config-verified].
+# Tulu-3 alternative (length-normalized) in comments — DO NOT mix the betas.
+
+model_name_or_path: out/sft-full       # ALWAYS start DPO from your SFT model
+torch_dtype: bfloat16
+attn_implementation: flash_attention_2
+
+dataset_name: HuggingFaceH4/ultrafeedback_binarized   # prefer on-policy + strong RM annotation
+dataset_num_proc: 12
+
+bf16: true
+beta: 0.01                     # standard DPO loss. Length-normalized (Tulu 3): beta 5
+# loss_type: sigmoid           # Tulu 3: length-normalized variant
+learning_rate: 5.0e-7          # the kill switch; grid 3e-7/5e-7/8e-7/1e-6; 1e-5 = lobotomy
+lr_scheduler_type: cosine      # Tulu 3: linear
+warmup_ratio: 0.1
+num_train_epochs: 1            # 1 epoch; watch length + GSM8K probe
+max_length: 1024               # Tulu 3: 2048
+max_prompt_length: 512
+per_device_train_batch_size: 8
+gradient_accumulation_steps: 2 # effective batch ~128 sequences across 8 GPUs
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+optim: adamw_torch
+
+logging_steps: 10
+eval_strategy: steps
+eval_steps: 100
+save_strategy: steps
+save_steps: 100
+save_total_limit: 2
+seed: 42
+output_dir: out/dpo-full
+report_to: [wandb]

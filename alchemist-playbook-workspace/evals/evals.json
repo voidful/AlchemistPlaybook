@@ -1,0 +1,26 @@
+{
+  "skill_name": "alchemist-playbook",
+  "evals": [
+    {
+      "id": 0,
+      "name": "pretrain-loss-spike-debug",
+      "prompt": "I'm pretraining a 7B llama-style model on 2T tokens, 64 H100s, global batch 4M tokens, AdamW lr 3e-4, betas (0.9, 0.999), eps 1e-5, cosine schedule, warmup 1000 steps, bf16. Around 80B tokens in, loss spiked from 2.4 to 4.1 and mostly recovered, but it has spiked twice more since. Grad norm jumps to ~40 right before each spike (normally ~0.6). What should I change?",
+      "expected_output": "Identifies beta2=0.999 and eps=1e-5 as spike amplifiers; recommends 0.95 / 1e-8 with LLaMA/OLMo attribution; rewind+skip-batches SOP (PaLM/OLMo); possibly longer warmup, QK-norm/z-loss for future runs; keeps lr 3e-4 as standard for 7B; structured diagnosis/recipe/evidence/verify.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "dpo-config-review-beta-confusion",
+      "prompt": "Please review my DPO config for Llama-3.1-8B (running on top of my SFT checkpoint): beta=5, learning_rate=2e-5, num_train_epochs=3, max_length=4096, standard sigmoid DPO loss in TRL, effective batch 32. The model's outputs are getting repetitive and GSM8K dropped 15 points. What's wrong?",
+      "expected_output": "Flags lr 2e-5 as ~40x too high (DPO needs ~5e-7); explains beta=5 belongs to length-normalized DPO (Tulu 3) while standard sigmoid loss uses ~0.01-0.1 (Zephyr/DPO paper); recommends 1 epoch; links repetition+GSM8K drop to oversized LR (SimPO evidence); suggests batch ~128 and monitoring length/GSM8K.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "speech-asr-warmup-divergence",
+      "prompt": "I'm training a ~1B parameter E-Branchformer encoder-decoder ASR model in ESPnet on about 40k hours of speech, batch around 256, AdamW peak lr 2e-4, warmup 5000 steps - same warmup I use for my text LLM runs. Loss goes NaN during warmup almost every time. My text recipes never do this. What's different about speech and what should I set?",
+      "expected_output": "Explains speech encoder-decoder models need far longer (often staged/piecewise) warmup: OWSM v3.1 used 60K warmup steps at 1B scale; suggests 25-60K warmup or piecewise schedule; mentions Whisper conventions (beta2 0.98, eps 1e-6) and/or joint CTC 0.3 as stabilizers; warns against transplanting text-LLM warmup; cites OWSM/Whisper.",
+      "files": []
+    }
+  ]
+}

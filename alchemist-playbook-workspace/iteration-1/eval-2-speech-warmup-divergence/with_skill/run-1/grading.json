@@ -1,0 +1,35 @@
+{
+ "expectations": [
+  {
+   "text": "Warmup too short; recommends 25K-60K or staged/piecewise",
+   "passed": true,
+   "evidence": "'warmup_steps: 5000 -> 25000-40000... if it still diverges -> OWSM-style two-segment warmup to 60000'."
+  },
+  {
+   "text": "References OWSM v3.1 or another published speech recipe by name",
+   "passed": true,
+   "evidence": "OWSM v3.1 medium named with config string 'piecewise_lr2e-4_warmup60k'; Whisper large/large-v2 LRs."
+  },
+  {
+   "text": "Mentions Whisper Adam conventions (beta2 0.98/eps 1e-6) or CTC stabilization",
+   "passed": true,
+   "evidence": "'optimizer.beta2 -> 0.98, eps -> 1e-6 # Whisper' (Appendix F cited)."
+  },
+  {
+   "text": "Explains why speech differs from text",
+   "passed": true,
+   "evidence": "Continuous noisy acoustic features reshape loss landscape; E-Branchformer warmup fragility; NaN-vs-spike distinction with masking/log(0) checks."
+  },
+  {
+   "text": "Keeps peak LR ~2e-4 rather than slashing to text levels",
+   "passed": true,
+   "evidence": "'peak lr: 2e-4 -> keep... do NOT cut first', in-regime evidence from OWSM/Whisper."
+  }
+ ],
+ "summary": {
+  "passed": 5,
+  "failed": 0,
+  "total": 5,
+  "pass_rate": 1.0
+ }
+}

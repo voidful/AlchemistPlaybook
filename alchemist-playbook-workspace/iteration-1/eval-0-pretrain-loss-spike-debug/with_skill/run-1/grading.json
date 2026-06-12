@@ -1,0 +1,35 @@
+{
+ "expectations": [
+  {
+   "text": "Recommends beta2 = 0.95 (down from 0.999)",
+   "passed": true,
+   "evidence": "Recipe block: 'optimizer.betas: (0.9, 0.999) -> (0.9, 0.95)' with LLaMA/OLMo/DeepSeek citations."
+  },
+  {
+   "text": "Recommends smaller Adam epsilon (1e-8)",
+   "passed": true,
+   "evidence": "'optimizer.eps: 1e-5 -> 1e-8', cites OLMo 2 official configs (config-verified)."
+  },
+  {
+   "text": "Prescribes rewind+skip batches attributed to PaLM or OLMo",
+   "passed": true,
+   "evidence": "'restart from the last checkpoint before the most recent spike, skip the ~200-500 batches' citing PaLM 5.1 and OLMo."
+  },
+  {
+   "text": "Does not blame/lower the 3e-4 peak LR as primary fix",
+   "passed": true,
+   "evidence": "Frames config as 'one knob away from Llama 2 7B'; LR untouched in recipe."
+  },
+  {
+   "text": "Includes concrete verification plan (metric + window) or rollback",
+   "passed": true,
+   "evidence": "Verify section: grad-norm < 2x median over next 5k steps, loss rejoins trend within ~1B tokens; explicit rollback rules."
+  }
+ ],
+ "summary": {
+  "passed": 5,
+  "failed": 0,
+  "total": 5,
+  "pass_rate": 1.0
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "expectations": [
+  {
+   "text": "Identifies lr=2e-5 as dominant error; recommends ~5e-7 (3e-7..1e-6)",
+   "passed": true,
+   "evidence": "'That's an SFT-scale LR... use 5e-7, at most ~1e-6'."
+  },
+  {
+   "text": "Explains beta-loss coupling (5 <-> length-normalized; 0.01-0.1 <-> sigmoid)",
+   "passed": false,
+   "evidence": "Treats beta=5 as simply ~50x too large with gradient-scale math; never surfaces that beta=5 is the correct published value under length-normalized DPO (Tulu 3)."
+  },
+  {
+   "text": "Recommends reducing to 1 epoch",
+   "passed": true,
+   "evidence": "'num_train_epochs=1 # was 3'."
+  },
+  {
+   "text": "Cites at least one published run/config",
+   "passed": true,
+   "evidence": "Names Zephyr and Tulu for 5e-7."
+  },
+  {
+   "text": "Links repetition/GSM8K to oversized LR + monitoring suggestion",
+   "passed": true,
+   "evidence": "Alignment-tax explanation plus rewards/accuracies, logps/chosen, GSM8K every 100-200 steps."
+  }
+ ],
+ "summary": {
+  "passed": 4,
+  "failed": 1,
+  "total": 5,
+  "pass_rate": 0.8
+ }
+}

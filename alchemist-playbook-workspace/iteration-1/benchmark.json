@@ -1,0 +1,323 @@
+{
+  "metadata": {
+    "skill_name": "alchemist-playbook",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-06-11T19:35:09Z",
+    "evals_run": [
+      0,
+      1,
+      2
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 129.1,
+        "tokens": 38006,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Recommends beta2 = 0.95 (down from 0.999)",
+          "passed": true,
+          "evidence": "Recipe block: 'optimizer.betas: (0.9, 0.999) -> (0.9, 0.95)' with LLaMA/OLMo/DeepSeek citations."
+        },
+        {
+          "text": "Recommends smaller Adam epsilon (1e-8)",
+          "passed": true,
+          "evidence": "'optimizer.eps: 1e-5 -> 1e-8', cites OLMo 2 official configs (config-verified)."
+        },
+        {
+          "text": "Prescribes rewind+skip batches attributed to PaLM or OLMo",
+          "passed": true,
+          "evidence": "'restart from the last checkpoint before the most recent spike, skip the ~200-500 batches' citing PaLM 5.1 and OLMo."
+        },
+        {
+          "text": "Does not blame/lower the 3e-4 peak LR as primary fix",
+          "passed": true,
+          "evidence": "Frames config as 'one knob away from Llama 2 7B'; LR untouched in recipe."
+        },
+        {
+          "text": "Includes concrete verification plan (metric + window) or rollback",
+          "passed": true,
+          "evidence": "Verify section: grad-norm < 2x median over next 5k steps, loss rejoins trend within ~1B tokens; explicit rollback rules."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 97.8,
+        "tokens": 32065,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies lr=2e-5 as dominant error; recommends ~5e-7 (3e-7..1e-6)",
+          "passed": true,
+          "evidence": "'~40x too high... 2e-5 -> 5e-7, grid 3e-7/5e-7/8e-7/1e-6'."
+        },
+        {
+          "text": "Explains beta-loss coupling (5 <-> length-normalized; 0.01-0.1 <-> sigmoid)",
+          "passed": true,
+          "evidence": "Full paragraph: beta=5 is Tulu 3's length-normalized value; sigmoid uses 0.01-0.1; 'Never transplant beta across loss variants.'"
+        },
+        {
+          "text": "Recommends reducing to 1 epoch",
+          "passed": true,
+          "evidence": "'num_train_epochs: 3 -> 1' citing Zephyr/Tulu 3/SimPO."
+        },
+        {
+          "text": "Cites at least one published run/config",
+          "passed": true,
+          "evidence": "Zephyr [config], Tulu 3 [config], SimPO [config], DPO paper [paper]."
+        },
+        {
+          "text": "Links repetition/GSM8K to oversized LR + monitoring suggestion",
+          "passed": true,
+          "evidence": "SimPO '1e-5 lobotomy' evidence; monitoring: pair accuracy, response length, GSM8K probe vs SFT input model."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 65.8,
+        "tokens": 33505,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warmup too short; recommends 25K-60K or staged/piecewise",
+          "passed": true,
+          "evidence": "'warmup_steps: 5000 -> 25000-40000... if it still diverges -> OWSM-style two-segment warmup to 60000'."
+        },
+        {
+          "text": "References OWSM v3.1 or another published speech recipe by name",
+          "passed": true,
+          "evidence": "OWSM v3.1 medium named with config string 'piecewise_lr2e-4_warmup60k'; Whisper large/large-v2 LRs."
+        },
+        {
+          "text": "Mentions Whisper Adam conventions (beta2 0.98/eps 1e-6) or CTC stabilization",
+          "passed": true,
+          "evidence": "'optimizer.beta2 -> 0.98, eps -> 1e-6 # Whisper' (Appendix F cited)."
+        },
+        {
+          "text": "Explains why speech differs from text",
+          "passed": true,
+          "evidence": "Continuous noisy acoustic features reshape loss landscape; E-Branchformer warmup fragility; NaN-vs-spike distinction with masking/log(0) checks."
+        },
+        {
+          "text": "Keeps peak LR ~2e-4 rather than slashing to text levels",
+          "passed": true,
+          "evidence": "'peak lr: 2e-4 -> keep... do NOT cut first', in-regime evidence from OWSM/Whisper."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.6,
+        "passed": 3,
+        "failed": 2,
+        "total": 5,
+        "time_seconds": 81.9,
+        "tokens": 19931,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Recommends beta2 = 0.95 (down from 0.999)",
+          "passed": true,
+          "evidence": "'Set beta2 = 0.95... single highest-impact fix.'"
+        },
+        {
+          "text": "Recommends smaller Adam epsilon (1e-8)",
+          "passed": false,
+          "evidence": "Explicitly recommends KEEPING eps=1e-5 ('don't fix it to 1e-8') \u2014 contradicts OLMo 2's published stability change."
+        },
+        {
+          "text": "Prescribes rewind+skip batches attributed to PaLM or OLMo",
+          "passed": true,
+          "evidence": "'use the PaLM recipe: rewind to the last good checkpoint and skip the ~100-500 data batches'."
+        },
+        {
+          "text": "Does not blame/lower the 3e-4 peak LR as primary fix",
+          "passed": true,
+          "evidence": "'Your LR itself isn't wrong \u2014 3e-4 at 4M batch is the LLaMA-7B recipe'; LR demoted to secondary knob."
+        },
+        {
+          "text": "Includes concrete verification plan (metric + window) or rollback",
+          "passed": false,
+          "evidence": "Has a monitoring list and 'expected outcome' but no success criterion, observation window, or rollback plan."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8,
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "time_seconds": 86.6,
+        "tokens": 20780,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Identifies lr=2e-5 as dominant error; recommends ~5e-7 (3e-7..1e-6)",
+          "passed": true,
+          "evidence": "'That's an SFT-scale LR... use 5e-7, at most ~1e-6'."
+        },
+        {
+          "text": "Explains beta-loss coupling (5 <-> length-normalized; 0.01-0.1 <-> sigmoid)",
+          "passed": false,
+          "evidence": "Treats beta=5 as simply ~50x too large with gradient-scale math; never surfaces that beta=5 is the correct published value under length-normalized DPO (Tulu 3)."
+        },
+        {
+          "text": "Recommends reducing to 1 epoch",
+          "passed": true,
+          "evidence": "'num_train_epochs=1 # was 3'."
+        },
+        {
+          "text": "Cites at least one published run/config",
+          "passed": true,
+          "evidence": "Names Zephyr and Tulu for 5e-7."
+        },
+        {
+          "text": "Links repetition/GSM8K to oversized LR + monitoring suggestion",
+          "passed": true,
+          "evidence": "Alignment-tax explanation plus rewards/accuracies, logps/chosen, GSM8K every 100-200 steps."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8,
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "time_seconds": 96.6,
+        "tokens": 21129,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Warmup too short; recommends 25K-60K or staged/piecewise",
+          "passed": true,
+          "evidence": "'set warmup_steps: 25000-40000'."
+        },
+        {
+          "text": "References OWSM v3.1 or another published speech recipe by name",
+          "passed": false,
+          "evidence": "Cites generic 'ESPnet Conformer/E-Branchformer recipes'; no named published run (OWSM/Whisper) or paper."
+        },
+        {
+          "text": "Mentions Whisper Adam conventions (beta2 0.98/eps 1e-6) or CTC stabilization",
+          "passed": true,
+          "evidence": "Extensive CTC-inf analysis (T<L alignment failure) and CTC guards \u2014 satisfies the CTC arm of the assertion."
+        },
+        {
+          "text": "Explains why speech differs from text",
+          "passed": true,
+          "evidence": "Strong mechanistic account: CTC inf, unnormalized fbank range, length variance, fp16 overflow."
+        },
+        {
+          "text": "Keeps peak LR ~2e-4 rather than slashing to text levels",
+          "passed": true,
+          "evidence": "'Peak 2e-4 is fine with long warmup'."
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 97.5667,
+        "stddev": 31.6506,
+        "min": 65.8,
+        "max": 129.1
+      },
+      "tokens": {
+        "mean": 34525.3333,
+        "stddev": 3099.1419,
+        "min": 32065,
+        "max": 38006
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.7333,
+        "stddev": 0.1155,
+        "min": 0.6,
+        "max": 0.8
+      },
+      "time_seconds": {
+        "mean": 88.3667,
+        "stddev": 7.5076,
+        "min": 81.9,
+        "max": 96.6
+      },
+      "tokens": {
+        "mean": 20613.3333,
+        "stddev": 616.1447,
+        "min": 19931,
+        "max": 21129
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.27",
+      "time_seconds": "+9.2",
+      "tokens": "+13912"
+    }
+  },
+  "notes": []
+}

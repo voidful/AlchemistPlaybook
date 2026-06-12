@@ -1,0 +1,46 @@
+# Framework-neutral 1-2B pretraining spec (the "small-model sandbox" recipe)
+# Anchors: SmolLM2-1.7B [paper], OLMo-1B [paper], OLMo-2 configs [config].
+# Translate keys into your trainer (OLMo-core / Nanotron / Megatron / litgpt).
+
+model:
+  params: ~1.5e9
+  arch: decoder-only, RMSNorm (no bias), SwiGLU, RoPE, GQA, no dropout, no linear bias
+  init: normal(0, 0.02)            # OLMo-2 simplicity-wins finding
+  vocab: multiple of 128
+
+data:
+  tokens_total: 50e9               # pilot; production small models overtrain (SmolLM2: 11T)
+  dedup: document-level + near-dup (FineWeb lesson)
+  frozen_val_slice: 0.5-1%         # never retuned
+  curriculum: keep best math/code/domain data for a late anneal stage
+
+train:
+  seq_len: 2048
+  global_batch_tokens: 2e6         # SmolLM2 band; 4e6 also fine
+  precision: bf16 (fp32 grad-reduce, fp32 norms)
+  activation_checkpointing: true
+
+optimizer:
+  name: adamw
+  peak_lr: 5.0e-4                  # SmolLM2 1.7B; OLMo-1B 4e-4
+  betas: [0.9, 0.95]
+  eps: 1.0e-8
+  weight_decay: 0.1
+  grad_clip_norm: 1.0
+
+scheduler:
+  type: wsd                        # cosine->10% equally defensible if budget fixed
+  warmup_steps: 2000
+  decay_fraction: 0.10             # final 10% of steps, decay to ~0
+
+stability:                         # default-on for new runs; cheap insurance
+  z_loss: 1.0e-5                   # OLMo-2
+  qk_norm: true                    # OLMo-2 / Wortsman
+
+eval:
+  every_steps: 1000                # OLMo cadence
+  metrics: [val_loss_frozen_slice, hellaswag_subset, arc_easy_subset]
+  log: [loss, grad_norm, lr, tokens_seen, tok_per_sec]
+
+checkpoint:
+  every_tokens: 1e9                # spike-rewind granularity; log data order for replay

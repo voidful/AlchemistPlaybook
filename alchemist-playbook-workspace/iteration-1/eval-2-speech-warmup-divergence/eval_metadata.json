@@ -1,0 +1,8 @@
+{"eval_id": 2, "eval_name": "speech-warmup-divergence",
+ "prompt": "I'm training a ~1B parameter E-Branchformer encoder-decoder ASR model in ESPnet on about 40k hours of speech, batch around 256, AdamW peak lr 2e-4, warmup 5000 steps - same warmup I use for my text LLM runs. Loss goes NaN during warmup almost every time. My text recipes never do this. What's different about speech and what should I set?",
+ "assertions": [
+  "Identifies warmup as too short for speech and recommends 25K-60K steps or staged/piecewise warmup",
+  "References OWSM v3.1 (60K piecewise warmup at 1B scale) or another published speech recipe by name",
+  "Mentions speech Adam conventions (beta2 0.98 / eps 1e-6 from Whisper) or CTC-related stabilization",
+  "Explains why speech differs from text (continuous noisy features / encoder-decoder dynamics), not just generic advice",
+  "Keeps peak LR ~2e-4 as plausible for 1B speech rather than reflexively slashing it to text-SFT levels"]}

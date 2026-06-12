@@ -1,0 +1,17 @@
+{
+  "_comment": "ZeRO-2: shards optimizer+grads only. Prefer over ZeRO-3 when the model fits — cheaper communication. bf16 compute, fp32 grad reduce.",
+  "bf16": { "enabled": true },
+  "zero_optimization": {
+    "stage": 2,
+    "overlap_comm": true,
+    "contiguous_gradients": true,
+    "reduce_bucket_size": 5e8,
+    "allgather_bucket_size": 5e8
+  },
+  "gradient_clipping": 1.0,
+  "train_batch_size": "auto",
+  "train_micro_batch_size_per_gpu": "auto",
+  "gradient_accumulation_steps": "auto",
+  "steps_per_print": 50,
+  "wall_clock_breakdown": false
+}

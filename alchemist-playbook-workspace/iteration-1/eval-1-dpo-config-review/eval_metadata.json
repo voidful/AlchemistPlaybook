@@ -1,0 +1,8 @@
+{"eval_id": 1, "eval_name": "dpo-config-review",
+ "prompt": "Please review my DPO config for Llama-3.1-8B (running on top of my SFT checkpoint): beta=5, learning_rate=2e-5, num_train_epochs=3, max_length=4096, standard sigmoid DPO loss in TRL, effective batch 32. The model's outputs are getting repetitive and GSM8K dropped 15 points. What's wrong?",
+ "assertions": [
+  "Identifies learning_rate=2e-5 as the dominant error and recommends ~5e-7 (3e-7 to 1e-6 range)",
+  "Explains the beta-loss coupling: beta=5 belongs to length-normalized DPO; standard sigmoid uses ~0.01-0.1",
+  "Recommends reducing to 1 epoch",
+  "Cites at least one published run/config (Zephyr, Tulu 3, SimPO, or DPO paper) for the numbers",
+  "Links repetition/GSM8K regression to oversized LR and suggests monitoring (length stats or GSM8K probe)"]}

@@ -1,0 +1,35 @@
+{
+ "expectations": [
+  {
+   "text": "Warmup too short; recommends 25K-60K or staged/piecewise",
+   "passed": true,
+   "evidence": "'set warmup_steps: 25000-40000'."
+  },
+  {
+   "text": "References OWSM v3.1 or another published speech recipe by name",
+   "passed": false,
+   "evidence": "Cites generic 'ESPnet Conformer/E-Branchformer recipes'; no named published run (OWSM/Whisper) or paper."
+  },
+  {
+   "text": "Mentions Whisper Adam conventions (beta2 0.98/eps 1e-6) or CTC stabilization",
+   "passed": true,
+   "evidence": "Extensive CTC-inf analysis (T<L alignment failure) and CTC guards \u2014 satisfies the CTC arm of the assertion."
+  },
+  {
+   "text": "Explains why speech differs from text",
+   "passed": true,
+   "evidence": "Strong mechanistic account: CTC inf, unnormalized fbank range, length variance, fp16 overflow."
+  },
+  {
+   "text": "Keeps peak LR ~2e-4 rather than slashing to text levels",
+   "passed": true,
+   "evidence": "'Peak 2e-4 is fine with long warmup'."
+  }
+ ],
+ "summary": {
+  "passed": 4,
+  "failed": 1,
+  "total": 5,
+  "pass_rate": 0.8
+ }
+}

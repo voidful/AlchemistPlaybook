@@ -1,0 +1,43 @@
+# QLoRA SFT — single-GPU 7-8B fine-tune (TRL + PEFT + bitsandbytes)
+# Anchor recipe: QLoRA paper [paper] + handbook conventions.
+
+model_name_or_path: meta-llama/Llama-3.1-8B
+torch_dtype: bfloat16
+attn_implementation: flash_attention_2
+
+# 4-bit base (QLoRA stack)
+load_in_4bit: true
+bnb_4bit_quant_type: nf4
+bnb_4bit_use_double_quant: true
+bnb_4bit_compute_dtype: bfloat16
+
+# LoRA — all linear modules; this matters more than rank
+use_peft: true
+lora_r: 16                     # 16-64; raise for harder domain shifts
+lora_alpha: 32                 # keep alpha/r roughly constant if you change r
+lora_dropout: 0.05
+lora_target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+dataset_name: your/sft-dataset
+bf16: true
+learning_rate: 2.0e-4          # QLoRA 7-13B; 33-65B use 1e-4. ~10-20x full-FT LR.
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+num_train_epochs: 2            # 1-3 for small data
+max_seq_length: 2048
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 32   # effective batch 64
+gradient_checkpointing: true
+optim: paged_adamw_32bit       # survives activation memory spikes
+packing: true
+# Mask loss to assistant tokens.
+
+logging_steps: 10
+eval_strategy: steps
+eval_steps: 200
+save_strategy: steps
+save_steps: 200
+save_total_limit: 2
+seed: 42
+output_dir: out/qlora-sft
+report_to: [wandb]

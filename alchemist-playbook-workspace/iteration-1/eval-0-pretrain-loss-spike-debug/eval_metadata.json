@@ -1,0 +1,8 @@
+{"eval_id": 0, "eval_name": "pretrain-loss-spike-debug",
+ "prompt": "I'm pretraining a 7B llama-style model on 2T tokens, 64 H100s, global batch 4M tokens, AdamW lr 3e-4, betas (0.9, 0.999), eps 1e-5, cosine schedule, warmup 1000 steps, bf16. Around 80B tokens in, loss spiked from 2.4 to 4.1 and mostly recovered, but it has spiked twice more since. Grad norm jumps to ~40 right before each spike (normally ~0.6). What should I change?",
+ "assertions": [
+  "Recommends beta2 = 0.95 (down from 0.999)",
+  "Recommends smaller Adam epsilon (1e-8)",
+  "Prescribes rewind-to-checkpoint + skip offending batches, attributed to PaLM or OLMo",
+  "Does not blame or lower the 3e-4 peak LR as the primary fix (3e-4 is the published 7B standard)",
+  "Includes a concrete verification plan (metric + observation window) or rollback plan"]}

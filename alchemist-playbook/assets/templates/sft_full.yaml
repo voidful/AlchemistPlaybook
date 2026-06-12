@@ -1,0 +1,33 @@
+# Full-parameter SFT (TRL / alignment-handbook style)
+# Anchor recipe: Zephyr-7B SFT [config-verified]; Tulu-3 variant in comments.
+# Launch: accelerate launch --config_file accelerate_zero3.yaml sft.py config.yaml
+
+model_name_or_path: meta-llama/Llama-3.1-8B   # your base
+torch_dtype: bfloat16
+attn_implementation: flash_attention_2
+
+dataset_name: HuggingFaceH4/ultrachat_200k    # your SFT mix
+dataset_num_proc: 12
+
+bf16: true
+learning_rate: 2.0e-5          # Zephyr. Tulu-3-8B used 5e-6 (linear, warmup 0.03)
+lr_scheduler_type: cosine      # Tulu 3: linear
+warmup_ratio: 0.1              # Tulu 3: 0.03
+num_train_epochs: 1            # 1-2; more overfits style
+max_seq_length: 2048           # Tulu 3: 4096 — match your data length profile
+per_device_train_batch_size: 16
+gradient_accumulation_steps: 1 # target effective batch ~128 sequences
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+packing: true                  # verify separators by decoding one batch
+# Loss must be masked to assistant tokens (assistant_only_loss / response template).
+
+logging_steps: 5
+eval_strategy: epoch
+save_strategy: steps
+save_steps: 100
+save_total_limit: 2
+seed: 42
+output_dir: out/sft-full
+report_to: [wandb]

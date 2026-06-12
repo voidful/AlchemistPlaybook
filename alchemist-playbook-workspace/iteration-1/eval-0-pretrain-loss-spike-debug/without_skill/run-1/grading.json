@@ -1,0 +1,35 @@
+{
+ "expectations": [
+  {
+   "text": "Recommends beta2 = 0.95 (down from 0.999)",
+   "passed": true,
+   "evidence": "'Set beta2 = 0.95... single highest-impact fix.'"
+  },
+  {
+   "text": "Recommends smaller Adam epsilon (1e-8)",
+   "passed": false,
+   "evidence": "Explicitly recommends KEEPING eps=1e-5 ('don't fix it to 1e-8') \u2014 contradicts OLMo 2's published stability change."
+  },
+  {
+   "text": "Prescribes rewind+skip batches attributed to PaLM or OLMo",
+   "passed": true,
+   "evidence": "'use the PaLM recipe: rewind to the last good checkpoint and skip the ~100-500 data batches'."
+  },
+  {
+   "text": "Does not blame/lower the 3e-4 peak LR as primary fix",
+   "passed": true,
+   "evidence": "'Your LR itself isn't wrong \u2014 3e-4 at 4M batch is the LLaMA-7B recipe'; LR demoted to secondary knob."
+  },
+  {
+   "text": "Includes concrete verification plan (metric + window) or rollback",
+   "passed": false,
+   "evidence": "Has a monitoring list and 'expected outcome' but no success criterion, observation window, or rollback plan."
+  }
+ ],
+ "summary": {
+  "passed": 3,
+  "failed": 2,
+  "total": 5,
+  "pass_rate": 0.6
+ }
+}

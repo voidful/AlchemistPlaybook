@@ -1,0 +1,35 @@
+{
+ "expectations": [
+  {
+   "text": "Identifies lr=2e-5 as dominant error; recommends ~5e-7 (3e-7..1e-6)",
+   "passed": true,
+   "evidence": "'~40x too high... 2e-5 -> 5e-7, grid 3e-7/5e-7/8e-7/1e-6'."
+  },
+  {
+   "text": "Explains beta-loss coupling (5 <-> length-normalized; 0.01-0.1 <-> sigmoid)",
+   "passed": true,
+   "evidence": "Full paragraph: beta=5 is Tulu 3's length-normalized value; sigmoid uses 0.01-0.1; 'Never transplant beta across loss variants.'"
+  },
+  {
+   "text": "Recommends reducing to 1 epoch",
+   "passed": true,
+   "evidence": "'num_train_epochs: 3 -> 1' citing Zephyr/Tulu 3/SimPO."
+  },
+  {
+   "text": "Cites at least one published run/config",
+   "passed": true,
+   "evidence": "Zephyr [config], Tulu 3 [config], SimPO [config], DPO paper [paper]."
+  },
+  {
+   "text": "Links repetition/GSM8K to oversized LR + monitoring suggestion",
+   "passed": true,
+   "evidence": "SimPO '1e-5 lobotomy' evidence; monitoring: pair accuracy, response length, GSM8K probe vs SFT input model."
+  }
+ ],
+ "summary": {
+  "passed": 5,
+  "failed": 0,
+  "total": 5,
+  "pass_rate": 1.0
+ }
+}
