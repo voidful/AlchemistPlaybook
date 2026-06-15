@@ -3,15 +3,21 @@ name: alchemist-playbook
 description: >-
   Evidence-based training-recipe advisor ("煉丹調參") distilled from published
   training runs: LLaMA 1/2/3, OLMo 1/2/3, DeepSeek-V3, SmolLM2, MiniCPM,
-  Kimi K2 (MuonClip), Pythia, Zephyr/Alignment Handbook, Tulu 3, SimPO, ORPO,
+  Kimi K2 (MuonClip), LFM2 (Liquid AI, edge/hybrid + distillation), Pythia,
+  Zephyr/Alignment Handbook, Tulu 3, SimPO, ORPO,
   QLoRA, Whisper, OWSM, wav2vec 2.0, HuBERT. Use this skill whenever the user
   asks about training hyperparameters (learning rate, batch size, warmup,
   scheduler, optimizer, beta, weight decay, epochs), debugging a training run
   (loss spike, NaN, divergence, slow convergence, overfitting, unstable
   gradients), designing a pretraining / SFT / DPO / RLHF / RLVR / LoRA /
-  QLoRA / speech (ASR/TTS) recipe, choosing compute or token budgets, or
-  mentions 煉丹, 調參, 调参, "training recipe", "fine-tuning settings",
-  "what LR should I use" — even if they never say the word "hyperparameter".
+  QLoRA / speech (ASR/TTS) recipe, choosing compute or token budgets, deciding
+  a knowledge-distillation / curriculum-learning / model-merging strategy,
+  training a small / on-device / edge model, deciding what to monitor or which
+  benchmarks / eval suite to run for a training stage (pretrain / mid-training
+  / post-training), catching capability regression or catastrophic forgetting,
+  or mentions 煉丹, 調參, 调参, "training recipe", "fine-tuning settings",
+  "what LR should I use", "evaluation / benchmark / eval suite", "release
+  gate" — even if they never say the word "hyperparameter".
 ---
 
 # Alchemist Playbook
@@ -47,6 +53,15 @@ like a doctor, prescribe like an engineer, and cite like a researcher.
 6. **One change per rerun.** Define the success metric and observation
    window before proposing a change. Never bundle three fixes you cannot
    attribute afterwards.
+7. **Monitoring is not evaluation.** Health monitoring (step/hour: loss,
+   grad-norm, NaN, MoE balance) answers "is the run alive"; capability eval
+   (per N tokens: frozen val slices + downstream probes) answers "is it
+   getting stronger without forgetting"; the release gate (a *private*
+   holdout) answers "can it ship". A run can be healthy while regressing a
+   capability the total loss hides, or pass public benchmarks while failing
+   the product — total loss masks bucketed regressions and public sets leak.
+   See `references/evaluation.md` for the per-stage metric and benchmark
+   catalogs.
 
 ## Intake checklist
 
@@ -65,13 +80,14 @@ Read the matching reference before answering anything non-trivial:
 
 | Topic | File |
 | --- | --- |
-| Pretraining from scratch, schedules (cosine/WSD), batch ramp, data mixes, midtraining/annealing | `references/pretraining.md` |
-| SFT, DPO, SimPO, ORPO, KTO, PPO, GRPO, RLVR, reward models | `references/post-training.md` |
+| Pretraining from scratch, schedules (cosine/WSD), batch ramp, data mixes, midtraining/annealing, distillation, difficulty-curriculum, hybrid/edge architectures | `references/pretraining.md` |
+| SFT, DPO, SimPO, ORPO, KTO, PPO, GRPO, RLVR, reward models, model merging | `references/post-training.md` |
 | Loss spikes, NaN, divergence, grad-norm anomalies, precision (bf16/fp16/FP8), QK-norm, z-loss, MuonClip | `references/stability.md` |
 | LoRA, QLoRA, low-budget fine-tuning | `references/peft.md` |
 | ASR, speech translation, speech SSL (wav2vec2/HuBERT), Whisper/OWSM, ESPnet | `references/speech.md` |
 | Compute/token budgets, Chinchilla, critical batch size, LR–batch scaling, muP, MFU | `references/scaling-and-batch.md` |
 | Symptom → cause → fix lookup, monitoring setup, pre-launch checklist | `references/diagnostics.md` |
+| What metrics to monitor and which benchmarks to run per stage, three-tier eval framework, mid-training retention suite, minimal eval suites, release gate | `references/evaluation.md` |
 | Full bibliography with verification status | `references/sources.md` |
 
 Multiple files often apply (e.g., a DPO loss spike → post-training + stability).
@@ -106,6 +122,11 @@ Peak pretraining LR by dense model size (AdamW, standard parametrization):
 | 30–70B | 1.5e-4 – 6e-4 | LLaMA-33B/65B and Llama-2-70B 1.5e-4; OLMo-2-32B 6e-4 (newer stability stack + 8M batch) |
 | ~405B | 8e-5 | Llama 3 405B (warmup 8000, cosine to 8e-7 over 1.2M steps) |
 | MoE | per-report | DeepSeek-V3 2.2e-4 (671B/37B-active); Moonlight/K2 use Muon — see stability.md |
+
+For sub-3B / on-device targets the highest-leverage levers are usually
+**distillation from a larger teacher** and **difficulty-ordered curriculum**,
+not these knobs — and a hybrid conv+attention backbone may beat an all-attention
+decoder under latency/memory budgets (LFM2). See `references/pretraining.md` §6–7.
 
 ## Cross-stage LR ladder (~8B dense example)
 

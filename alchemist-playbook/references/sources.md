@@ -36,6 +36,7 @@ Verification levels used across this skill:
 | Small-scale proxies | arXiv 2309.14322 (Wortsman et al.) | QK-norm + z-loss validation; LR-sensitivity grows with scale; proxy sweeps |
 | BLOOM | arXiv 2211.05100 | fp16 instability lesson → bf16 |
 | Ultra-Scale Playbook | huggingface.co/spaces/nanotron/ultrascale-playbook | distributed training systematics (4000+ runs, up to 512 GPUs); FP8 < bf16 stability |
+| LFM2 (Liquid AI) | arXiv 2511.23404 | edge/on-device hybrid (gated short-conv + GQA, hardware-in-the-loop arch search); 10–12T pretrain @4K ctx + 1T long-ctx midtrain @32K with accelerated LR decay; **Decoupled Top-K distillation** (teacher LFM1-7B, top-32, binary-mass + tempered-shape KL + hard-label CE); **difficulty-ordered curriculum** (12-model success-rate ensemble); ~10% input dropout on small models; SFT 3e-5→1e-7 / 3 epochs; **length-normalized direct alignment** β5, 8e-7→8e-8 (generalizes DPO + APO-zero); **parallel model-merging stage** (soup / task-arithmetic / TIES / DARE / DELLA) |
 
 ## Post-training
 
@@ -71,3 +72,28 @@ Verification levels used across this skill:
 ZeRO (arXiv 1910.02054), FSDP (arXiv 2304.11277), FlashAttention
 (arXiv 2205.14135), activation checkpointing (arXiv 1604.06174):
 cited for memory/throughput moves in diagnostics and templates.
+
+## Evaluation & benchmarks
+
+The three-tier framework (health monitoring / capability regression / release
+gate), the mid-training retention-suite requirement, and the minimal eval
+suites in `references/evaluation.md` are a **practitioner synthesis**
+`[heuristic]` consistent with the per-stage eval discipline of OLMo (in-loop
+eval cadence), Llama 3 (per-benchmark contamination analysis, private evals),
+and Tulu 3 (per-stage delta tables) already cited above. Benchmark facts
+stated in that file are properties of the named benchmark:
+
+| Benchmark | ID / link | Note this skill relies on |
+| --- | --- | --- |
+| MMLU / MMLU-Pro | arXiv 2009.03300 / 2406.01574 | MMLU-Pro: 10 options (vs 4), harder reasoning, better strong-model discrimination |
+| IFEval | arXiv 2311.07911 | ~500 prompts, ~25 auto-verifiable instruction types; strict/loose accuracy |
+| RULER | arXiv 2404.06654 | configurable length + multi-needle / multi-hop / aggregation; > vanilla NIAH |
+| SimpleQA | arXiv 2411.04368 (OpenAI) | short fact-seeking factuality; correct/incorrect/not-attempted |
+| HarmBench | arXiv 2402.04249 | standard safety red-team + robust-refusal eval |
+| GPQA | arXiv 2311.12022 | graduate-level science reasoning |
+| BFCL | gorilla.cs.berkeley.edu/leaderboard | function/tool-calling eval |
+| τ-bench | arXiv 2406.12045 | tool-agent task success in dynamic dialogue |
+| SWE-bench (Verified) | arXiv 2310.06770 + openai SWE-bench-Verified | repo-level resolved rate |
+| LiveCodeBench | arXiv 2403.07974 | contamination-resistant code (time-windowed) |
+| AlpacaEval 2 / Arena-Hard / MT-Bench | arXiv 2404.04475 / lmarena Arena-Hard / arXiv 2306.05685 | LLM-judge dialogue win-rate / Elo (relative, judge-dependent) |
+| Other named sets | C-Eval, CMMLU, AGIEval, BBH, GSM8K, MATH, HellaSwag, ARC, Winogrande, TruthfulQA, LongBench, FLORES-200, XNLI, WMDP, JailbreakBench, WebArena, GAIA, BFCL | standard benchmarks; cite by their canonical paper when precision matters |

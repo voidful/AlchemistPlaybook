@@ -49,6 +49,11 @@ add: response length, KL-to-reference (DPO/RL), reward mean (RL),
 DPO pair accuracy. Keep a frozen eval set for the entire project;
 never retune it mid-flight.
 
+This is the health-monitoring floor. For the full per-stage metric catalog
+(numerical-health, data-contamination, tokenizer, MoE-specific signals), the
+benchmark-by-capability tables, and ready-to-use minimal eval suites, see
+`references/evaluation.md`.
+
 ## When the user's report is incomplete
 
 Ask for exactly these four artifacts before diagnosing spikes:

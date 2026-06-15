@@ -11,6 +11,7 @@ report, `[reported]` secondary source.
 5. PPO / RLVR / GRPO
 6. Failure modes specific to post-training
 7. Evaluation discipline
+8. Model merging as a post-training stage
 
 ## 1. Algorithm chooser
 
@@ -23,6 +24,8 @@ report, `[reported]` secondary source.
 | Unpaired thumbs-up/down data | KTO | designed for unpaired signals (β default 0.1) |
 | Verifiable answers (math, code, constraints) | RLVR (PPO or GRPO) | Tulu 3's final stage; DeepSeek-R1's engine |
 | Iterative quality push with a reward model | PPO / iterative DPO | Llama-2-chat style (rejection sampling + PPO) |
+| Several good checkpoints, or capabilities to combine | Model merging (§8) | LFM2 runs soup/TIES/DARE/DELLA in parallel, evals, picks; near-free gains |
+| Training a sub-3B / on-device model | Distill first, then SFT→preference | distillation + curriculum beat optimizer tuning at small scale (pretraining.md §6) |
 
 ## 2. SFT recipes
 
@@ -33,6 +36,7 @@ report, `[reported]` secondary source.
 | Tulu 3 70B/405B SFT | Llama-3.1 | 2e-6 | linear | 0.03 | 2 | 128 / 256 | 4096 | `[config]` |
 | Llama-2-chat SFT | Llama-2 | 2e-5 | cosine | — | 2 | 64 seqs | 4096 | `[paper]` wd 0.1 |
 | SmolLM2 SFT | SmolLM2-1.7B | — | — | — | 2 | ~128 | 8192 | `[paper]` SmolTalk dataset; exact LR not re-verified — treat as `[reported]` |
+| LFM2 SFT | LFM2 base 0.35–8B | 3e-5 → 1e-7 | decay | — | 3 | per-size (micro 1 + accum) | 32768 | `[paper]` difficulty-curriculum-ordered data; base already distilled |
 
 Rules that matter more than the LR:
 
@@ -44,7 +48,10 @@ Rules that matter more than the LR:
 - **1–2 epochs.** More epochs overfit style. Exception precedent:
   InstructGPT trained SFT 16 epochs — val loss overfit after 1 epoch but
   RM-judged quality kept improving `[paper]`; if downstream (preference)
-  selection follows, mild SFT overfitting can be acceptable.
+  selection follows, mild SFT overfitting can be acceptable. LFM2 ran **3
+  epochs** on small models `[paper]` — defensible when the data is
+  difficulty-curriculum-ordered (pretraining.md §6) and the model is small,
+  but treat 3+ as the exception, not the default.
 - **Packing**: pack short examples into full sequences with correct
   attention separation; verify by decoding a batch (diagnostics.md).
 - NEFTune (uniform noise on embedding, α=5/10/15) is a cheap sometimes-win
@@ -62,6 +69,7 @@ Loss: `-log σ(β [log πθ(yw)/πref(yw) − log πθ(yl)/πref(yl)])`.
 | Tulu 3 70B/405B DPO | 2e-7 | 5 | length-normalized | linear | 0.1 | 1 | 128 / 256 | 2048 | `[config]` |
 | SimPO authors' DPO baselines | 3e-7–7e-7 | 0.01 | standard | — | — | 1 | 128 | — | `[config]` SimPO README |
 | DPO original paper | ~1e-6 (RMSprop) | 0.1 | standard | — | — | — | — | — | `[paper]` |
+| LFM2 direct alignment | 8e-7 → 8e-8 | 5 | **length-normalized** (generalized DPO + APO-zero) | decay | — | — | — | — | `[paper]` |
 
 **The β–loss-type coupling (critical, frequently misunderstood):**
 β=0.01 (Zephyr) and β=5 (Tulu 3) are *not* contradictory tuning opinions —
@@ -71,6 +79,16 @@ log-probs by sequence length, shrinking the logit-difference scale by
 comparable. Never transplant a β across loss variants. Length-normalization
 itself exists to kill DPO's length bias (longer answers accumulate larger
 log-prob sums).
+
+LFM2 independently lands on the **same β=5 with length-normalized rewards**
+`[paper]` (reward divided by response token count: Δ = r(yw)/|yw| −
+r(yl)/|yl|), and frames standard DPO and APO-zero as special cases of one
+generalized direct-alignment loss (choices of the comparison function f,
+margin m, and an absolute-reward term). Two takeaways: (1) further
+confirmation of the coupling — length-normalized ⇒ β≈5, standard ⇒
+β≈0.01–0.1; (2) if you want both "push the chosen up" and "don't drift"
+behavior, the generalized form (relative term + absolute δ term) is more
+expressive than vanilla DPO at no extra model cost.
 
 DPO practical rules:
 - LR is the kill switch: 1e-5 reliably lobotomizes a 7–8B model into
@@ -152,3 +170,36 @@ stats, one instruction-following probe (IFEval subset), one reasoning probe
 (GSM8K subset). Full evals only on stage exits. Compare against the
 *stage input* model, not only the final target — each stage must justify
 itself (Tulu 3's per-stage tables are the model to imitate).
+
+For the full SFT and DPO/RLHF/RL monitoring catalogs (instruction-following,
+format, factuality, refusal, reward-hacking, product metrics), the benchmark-
+by-capability tables, and the post-training minimal eval suite, see
+`references/evaluation.md` §5–8.
+
+## 8. Model merging as a post-training stage
+
+Weight-space merging is now an explicit, *evaluated* stage at the small-model
+frontier — not an afterthought.
+
+- **LFM2 `[paper]`** runs merging as its final post-training stage: it applies
+  **model soup, task arithmetic, TIES-Merging, DARE, and DELLA** in parallel
+  to candidate checkpoints and selects the best by evaluation. No single
+  technique wins universally — run several, eval, pick.
+- **OLMo 2 `[paper]`** model-souped (uniform weight average) 3 anneal runs
+  with different seeds/mixes into the final base checkpoint
+  (pretraining.md §4).
+
+When to reach for each:
+- **Several near-equivalent checkpoints** (different seeds, data mixes, or
+  post-training branches of one parent) → **model soup** (uniform average).
+  Nearly free and usually ≥ the best single member. Requires a shared
+  ancestor — don't soup unrelated models.
+- **Combine separately-trained capabilities** (e.g. math-tuned + chat-tuned
+  off the same base) → **task arithmetic** (sum the task vectors θ_ft − θ_base)
+  or **TIES** (trim small deltas, resolve sign conflicts, then merge).
+- **Many task vectors interfering** → **DARE / DELLA** randomly prune + rescale
+  delta weights before merging to cut interference.
+
+Always evaluate the merge against **each input model on every axis you care
+about** — merging can silently trade one capability for another. `mergekit`
+is the standard tooling `[reference]`.

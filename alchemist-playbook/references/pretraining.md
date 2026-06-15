@@ -9,8 +9,9 @@ Verification tags: `[config]` = read from official config/model card,
 3. Batch size: token math and ramp schedules
 4. Multi-stage curricula: midtraining and annealing
 5. Data: the highest-leverage knob
-6. Architecture hygiene checklist
-7. Pre-launch checklist
+6. Distillation and difficulty-curriculum for small / edge models
+7. Architecture hygiene checklist (incl. hybrid conv+attention)
+8. Pre-launch checklist
 
 ## 1. Master recipe table
 
@@ -31,6 +32,8 @@ Verification tags: `[config]` = read from official config/model card,
 | DeepSeek-V3 `[paper]` | 671B MoE (37B active) | 14.8T | 2.2e-4 | 2K steps | see §2 multi-phase | 3072 → 15360 seqs over first 469B tokens | 4096 | FP8 training, MTP auxiliary loss |
 | MiniCPM `[paper]` | 1.2/2.4B | ~1T | 0.01 under their muP-style parametrization (not comparable to SP LRs) | — | WSD, decay ≈ last 10% | ~4M | — | origin of WSD; sharp loss drop during decay phase |
 | Kimi K2 `[paper]` | 1T MoE (32B active) | 15.5T | — | — | — | — | — | Muon + QK-Clip (τ=100): zero loss spikes; see stability.md |
+| LFM2 dense `[paper]` | 0.35–2.6B | 10T + 1T mid | not disclosed (distillation-driven) | — | accel. decay in midtrain | — | 4096 → 32768 | AdamW (0.9,0.95) wd 0.1 clip 1.0; hybrid gated short-conv + GQA (6–8 attn of 16–30 layers); distilled from LFM1-7B; ~10% input dropout; see §6 |
+| LFM2-8B-A1B MoE `[paper]` | 8B (1B active) | 12T + 1T mid | not disclosed | — | accel. decay in midtrain | — | 4096 → 32768 | 32 experts/layer, top-4; same hybrid backbone; edge/on-device target |
 
 Cross-checks worth quoting: tokens-per-parameter ranges from Chinchilla-optimal
 ~20 (Chinchilla 70B/1.4T) to heavily overtrained ~6500 (SmolLM2). Overtraining
@@ -118,6 +121,18 @@ warmup (shorter, e.g., a few hundred steps) and cosine/WSD decay to ~0,
 mixing ~10–30% of original-distribution data to limit forgetting
 `[heuristic anchored to OLMo 2 stage-2 / Llama 3 anneal practice]`.
 
+**Evaluating a midtraining/anneal stage is a Pareto problem, not a single
+number.** The success criterion is `target capability ↑ − general capability
+forgotten − safety regression − added cost`, so a stage that boosts the
+target domain while silently regressing general ability, Chinese, safety, or
+tool use is a *failure* even if the target benchmark rose. Every midtraining
+run must own a fixed **retention suite** (general knowledge + Chinese + math +
+code + long-context + safety + target domain) measured against the *stage
+input* checkpoint. Catalog and minimal mid-training suite: `references/evaluation.md` §4.
+
+Note this section reorders **domains** over the run. Reordering **individual
+examples** by measured difficulty is a separate, composable lever — see §6.
+
 ## 5. Data: the highest-leverage knob
 
 - FineWeb `[paper]`: 15T tokens from 96 CommonCrawl snapshots; the ablations
@@ -133,7 +148,51 @@ mixing ~10–30% of original-distribution data to limit forgetting
   mix: roughly 50% general knowledge, 25% math/reasoning, 17% code, 8%
   multilingual `[paper]`.
 
-## 6. Architecture hygiene (modern decoder defaults)
+## 6. Distillation and difficulty-curriculum for small / edge models
+
+Below ~3B, two levers from the 2025 small-model playbook (LFM2; consistent
+with Gemma 2/3, MiniCPM, SmolLM3, Llama 3.2 1B/3B) move the needle more than
+any optimizer tweak. If the user is training a sub-3B model and a strong
+same-family teacher exists, **distillation is usually the single highest-
+leverage change available** — recommend it before debating LR.
+
+**Knowledge distillation — LFM2 "Decoupled Top-K" `[paper]`:**
+- Student matches a larger teacher's next-token distribution, blended with
+  ordinary next-token cross-entropy on hard labels (keep the CE term so the
+  student isn't capped by teacher errors).
+- The KL is split over the teacher's **top-32** tokens into two terms:
+  (a) a *binary* KL matching the total probability **mass** the teacher puts
+  on its top-32 set vs. the tail — left **untempered**; (b) a *conditional*
+  KL matching the **shape within** the top-32, with temperature τ applied
+  **only here**. Decoupling sidesteps the "support mismatch" that plain
+  tempered full-vocab KL suffers when teacher and student disagree on which
+  tokens are even plausible.
+- Steal-this-even-if-you-don't-copy-the-loss: (1) truncate to top-K (K≈32–64)
+  — cheaper and more stable than full-vocab KL; (2) always keep a hard-label
+  CE term; (3) put temperature on the *shape*, not the *mass*.
+- Teacher in LFM2 was LFM1-7B (≈3–20× the student). `[heuristic]` Pick a
+  teacher 3–10× larger from the same tokenizer/family; mismatched tokenizers
+  force logit re-alignment and usually aren't worth it.
+
+**Difficulty-ordered curriculum — LFM2 `[paper]`:**
+- Score each example by an *empirical* success rate p_i: run an ensemble of
+  ~12 diverse LMs and set p_i = fraction that solve/produce the item. Train
+  easy→hard (high p_i first), introducing items only the strongest models
+  handle later.
+- This is **orthogonal** to §4's data-mix annealing: that reorders *domains*
+  over the run; this reorders *individual examples* by measured difficulty.
+  They compose.
+- `[heuristic]` Cheap proxy when a 12-model ensemble is overkill: use one
+  judge model's per-example loss/perplexity (or length) as the difficulty
+  surrogate, bucket into 3–4 tiers, and ramp.
+
+**Input/embedding dropout for small models `[paper]`:** LFM2 applied ~10%
+input dropout during training — a deliberate exception to the "no dropout in
+pretraining" consensus baseline. Below ~2B, where capacity is small relative
+to a 10T+ token budget, light input dropout is a defensible regularizer;
+at ≥7B keep it off by default.
+
+## 7. Architecture hygiene (modern decoder defaults)
 
 RMSNorm (no bias) + SwiGLU + RoPE + GQA; no dropout; no linear bias; untied
 embeddings at ≥1B. Stability extras when justified: QK-norm, z-loss 1e-5,
@@ -144,7 +203,18 @@ Init: OLMo 2 uses plain normal(0, 0.02) everywhere `[paper]`, dropping
 scaled-init schemes — simplicity won. Tokenizer/vocab: round vocab to a
 multiple of 128 for kernel efficiency `[heuristic]`.
 
-## 7. Pre-launch checklist
+**Hybrid / edge architectures (LFM2) `[paper]`:** when the target is
+on-device (latency/memory-bound), the all-attention decoder is no longer the
+only default. LFM2 interleaves **gated short convolution** blocks (kernel
+size 3) with a *small* number of GQA attention layers (6 of 16 layers at
+≤1.2B; 8 of 30 at 2.6B; 6 of 24 in the 8B-A1B MoE), the mix chosen by
+hardware-in-the-loop search against on-device latency. Lesson for edge users:
+most token-mixing can be done by cheap short convs, with attention reserved
+for the few layers that need global context (≈2× faster decode at fixed
+quality). For server-side inference this trade rarely pays — keep full
+attention. Related families: Mamba/Jamba (SSM+attention), RWKV.
+
+## 8. Pre-launch checklist
 
 1. Smoke run: 1–5% of budget at full distributed layout. Must see: smooth
    loss, grad-norm flat after warmup, no memory growth, expected tok/s.
