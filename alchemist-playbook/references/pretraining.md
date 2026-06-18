@@ -192,6 +192,51 @@ pretraining" consensus baseline. Below ~2B, where capacity is small relative
 to a 10T+ token budget, light input dropout is a defensible regularizer;
 at ≥7B keep it off by default.
 
+**Two-Stage Diversity-Exploring Distillation (VibeThinker SSP, the SFT
+"spectrum" stage) `[paper 2511.06221]`:** builds a *diverse* SFT checkpoint
+(the Pass@K-coverage goal of post-training.md §9) by checkpoint-selection +
+merging, with **no external teacher** — this is *internal* self-distillation,
+distinct from LFM2's logit distillation from a larger teacher above.
+- *Stage 1 — Domain-Aware Diversity Probing:* partition the domain into N
+  subdomains (math used **N=4**: algebra, geometry, calculus, statistics),
+  build a per-subdomain probing set, periodically score intermediate SFT
+  checkpoints by **Pass@K**, and keep the Pass@K-maximizing checkpoint as that
+  subdomain's specialist (`M_i* = argmax_t P_i(t)`).
+- *Stage 2 — Expert Model Fusion:* merge the specialists by plain unweighted
+  parameter averaging (`w_i = 1/N`) — the model-soup of post-training.md §8
+  applied to diversity-selected experts that share an SFT trunk.
+- (1.5B SFT LR/schedule/epochs/batch/seq-len are **not stated** — don't assume.)
+
+**Reference-model rollout difficulty filtering (VibeThinker-3B curriculum SFT)
+`[paper 2606.16140]`:** a *cheaper* way to score per-example difficulty than
+LFM2's 12-model success-rate ensemble above — they sit side by side as two
+instances of an empirical difficulty curriculum.
+- Score difficulty with a **single smaller reference model**
+  (VibeThinker-1.5B): 8 rollouts/query, **keep problems with error-rate ≥0.75**
+  (drop the easy ones), and discard reasoning traces **shorter than 5K tokens**.
+- Two-stage schedule: **5 epochs** on the full curriculum, then **+2 epochs**
+  on the hard-sample subset at the same hyperparameters.
+- SFT hyperparameters (3B, verified): global **batch 128**, **LR 5e-5 →
+  cosine → 8e-8**, **5% linear warmup**, sequence packing. Base =
+  **Qwen2.5-Coder-3B**; the 1.5B started from **Qwen2.5-Math-1.5B** — starting
+  a small reasoning model from a domain-specialized (math/code) base matters.
+
+**Why bother with a tiny reasoning model — and where it stops `[heuristic /
+hypothesis]`:** VibeThinker reports a 1.5B reaching math/code/science reasoning
+"comparable to models tens to hundreds of times larger" via "meticulous
+algorithmic design" `[paper-claim — single run, no scale ablation]`. The 3B
+paper frames this as the **Parametric Compression-Coverage Hypothesis**:
+capabilities differ not only in *how much* parameter capacity they need but in
+the *structural form* of the demand — verifiable reasoning (search, constraint
+satisfaction, error correction, multi-step composition) is *compressible* into
+a compact reasoning core, while open-domain knowledge and long-tail facts need
+*broad parameter coverage* and therefore scale. Practitioner use: it is
+reasonable to pour RL/distillation effort into a small **reasoning** model, but
+don't expect a small model to close **knowledge-coverage** gaps (the 3B matches
+giant models on math/code yet trails on knowledge-heavy GPQA-Diamond). Honesty:
+supported only observationally — no mechanism-isolating ablations in either
+paper — so treat it as a hypothesis to test, not an established law.
+
 ## 7. Architecture hygiene (modern decoder defaults)
 
 RMSNorm (no bias) + SwiGLU + RoPE + GQA; no dropout; no linear bias; untied

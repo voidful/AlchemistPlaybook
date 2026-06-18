@@ -12,6 +12,8 @@ report, `[reported]` secondary source.
 6. Failure modes specific to post-training
 7. Evaluation discipline
 8. Model merging as a post-training stage
+9. The Spectrum-to-Signal Principle (SSP): SFT = diversity, RL = signal
+10. Multi-domain RLVR, length control, and offline self-distillation
 
 ## 1. Algorithm chooser
 
@@ -26,6 +28,7 @@ report, `[reported]` secondary source.
 | Iterative quality push with a reward model | PPO / iterative DPO | Llama-2-chat style (rejection sampling + PPO) |
 | Several good checkpoints, or capabilities to combine | Model merging (§8) | LFM2 runs soup/TIES/DARE/DELLA in parallel, evals, picks; near-free gains |
 | Training a sub-3B / on-device model | Distill first, then SFT→preference | distillation + curriculum beat optimizer tuning at small scale (pretraining.md §6) |
+| Building a small **reasoning** model (math/code/STEM) | SSP: diversity-first SFT → signal-amplifying RL (§9–§10) | optimize SFT for Pass@K coverage and select the SFT checkpoint by Pass@K, then let MGPO/GRPO sharpen Pass@1 (VibeThinker) |
 
 ## 2. SFT recipes
 
@@ -148,6 +151,27 @@ then all-scenario RL. Takeaway for users: rule-verifiable reward + GRPO is
 the cheapest credible path to reasoning gains; neural RMs invite reward
 hacking on long-horizon tasks.
 
+**MGPO (MaxEnt-Guided Policy Optimization)** `[paper 2511.06221 / 2606.16140]`
+— a difficulty-aware *advantage reweighting* on top of GRPO, used by both
+VibeThinker models. Keep GRPO's clipped, group-relative objective, then scale
+each prompt's advantage by an entropy-deviation weight that up-weights
+problems the model currently solves near a 50% rate and exponentially
+down-weights trivial (all-correct) and impossible (all-wrong) prompts:
+
+```
+p_c(q) = (1/G) Σ_i 1[r_i = 1]        # empirical group pass-rate (binary verifiable reward)
+w_ME    = exp(−λ · D_ME(p_c ‖ 0.5))   # D_ME = binary KL to a Bernoulli(0.5) max-entropy target
+A'      = w_ME · A                    # A = usual group-normalized (r_i − μ_G)/σ_G
+```
+
+λ≥0 is the sharpness knob (λ=0 ⇒ w_ME=1 ⇒ plain GRPO). Its **numeric value is
+not stated**, nor are G, RL LR, KL coef, clip ε, batch, or step count — do not
+invent them. Why it matters: it is a one-line change on any RLVR/GRPO stack,
+reusing the binary verifiable reward already present (no extra reward model),
+and a smooth differentiable alternative to DAPO-style hard pass-rate filtering
+(dropping all-correct/all-wrong groups). Note the 0.5 is the max-entropy
+*target* p₀, **not** an entropy or KL coefficient.
+
 RL guardrails: monitor KL to reference, mean reward, and response length
 together — reward↑ + KL↑ + length↑ is the hacking signature. Penalize
 missing EOS (Tulu 3's −10) to prevent run-on generations.
@@ -203,3 +227,63 @@ When to reach for each:
 Always evaluate the merge against **each input model on every axis you care
 about** — merging can silently trade one capability for another. `mergekit`
 is the standard tooling `[reference]`.
+
+## 9. The Spectrum-to-Signal Principle (SSP): SFT = diversity, RL = signal
+
+The "SFT first, always" default (§1) tells you to *do* SFT before RL. SSP
+(VibeThinker `[paper 2511.06221]`) tells you *what to optimize SFT for* when
+the goal is a reasoning model: not single-shot accuracy, but **coverage**.
+
+- **Spectrum (SFT):** SFT's job is "not to converge on a single optimal
+  answer, but to generate a rich and diverse 'spectrum' of plausible
+  solutions" — maximize **Pass@K** (does *any* of K samples solve it).
+- **Signal (RL):** RL then "identif[ies] and amplif[ies] the correct 'signal'
+  from within this pre-established spectrum" — sharpen **Pass@1**. RL only
+  redistributes probability onto paths the SFT model can already reach, so
+  "a model with high Pass@K … raises the upper bound of what RL can achieve."
+- **Actionable selection rule:** pick the SFT checkpoint by **Pass@K on a
+  held-out probing set, not by val-loss or Pass@1.** The paper argues that
+  selecting the Pass@1-maximizing SFT checkpoint "artificially constrains the
+  potential performance ceiling for the subsequent RL phase," whereas a
+  diversity-optimized checkpoint is "a superior prerequisite for RL … more
+  fertile ground for optimization." `[paper]`
+- **Diagnosing an RL plateau:** if Pass@1 saturates under RL, widen the SFT
+  spectrum upstream (more diverse SFT, select on Pass@K) instead of tuning RL
+  harder — RL cannot invent reasoning paths SFT never produced.
+- The 1.5B run reports the diversity-optimized model reaching SOTA on *both*
+  Pass@K and Pass@1 — diversity and accuracy were not in tension there
+  `[reported — single run, no controlled ablation]`.
+
+Implementation: the SFT side is "Two-Stage Diversity-Exploring Distillation"
+(pretraining.md §6); the RL side is MGPO (§5). Honest caveat: SSP's evidence is
+two strong runs from one team, not an ablation isolating the principle — treat
+the Pass@K checkpoint-selection rule as a high-value `[heuristic]` to A/B on
+your own task, not a proven law.
+
+## 10. Multi-domain RLVR, length control, and offline self-distillation
+
+VibeThinker-3B `[paper 2606.16140]` extends the SSP recipe with three reusable
+post-training moves (it shares the SSP/MGPO core with the 1.5B):
+
+- **Sequential multi-domain RLVR, one deterministic verifier per domain** —
+  math = final-answer verification (+ LLM-judge), code = sandbox execution
+  against test cases, STEM = answer-matching + option verification. Domains
+  trained **sequentially** (math → code → STEM) under one MGPO loop, with
+  **zero learned reward model**. Reinforces §5's "rule-verifiable reward, no
+  neural RM" lesson and shows it composing across domains. RL ran in a single
+  **64K** long-context window, replacing the usual progressive context-length
+  staging. (Numeric RL hyperparameters — LR, KL, group size G, batch, steps —
+  are **not stated**; do not assume them.)
+- **Long2Short reward redistribution** `[paper]` — a post-hoc brevity reward
+  applied to *correct* trajectories only, magnitude **λ=0.2**, biasing toward
+  shorter correct solutions without a hard length cap. An RL-stage analogue of
+  the length-bias remedies in §3/§6: shape length via reward, not truncation.
+- **Offline self-distillation to consolidate specialists into one student**
+  `[paper]` — collect verified trajectories from the math/code/STEM RL
+  checkpoints and re-train a single student by plain SFT, selecting traces by a
+  **learning-potential** score `S_LP = −(1/|y|)·Σ_t log π_student(y_t|q,y_<t)`
+  (length-normalized NLL — higher = not yet well-modeled by the student),
+  ranked *within* domain-specific length buckets and keeping the middle-to-high
+  band. This is an alternative to weight-space merging (§8) for unifying
+  specialists: distill *behavior* instead of averaging *weights*. (Self-
+  distillation LR/epochs/batch are **not stated**.)

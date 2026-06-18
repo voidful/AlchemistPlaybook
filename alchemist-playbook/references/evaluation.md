@@ -180,6 +180,31 @@ for safety red-team + robust-refusal evaluation. Prefer benchmarks with
 checkers) over LLM-judge scores wherever possible — judges drift and can be
 gamed.
 
+**Reporting protocol for reasoning benchmarks — avg@k mean-Pass@1 ≠ pass@k ≠
+maj@k `[paper 2511.06221 / 2606.16140]`.** Small-reasoning-model reports
+(VibeThinker) score by **averaging Pass@1 over many independent samples** per
+prompt (a variance-reduced *mean* Pass@1, i.e. avg@k) — this is *not*
+best-of-k **pass@k** and *not* majority-vote **maj@k / cons@k**; the three are
+different numbers, so never compare across them. Reproduction budgets used:
+**64** samples for competition math (AIME/HMMT), **8** for code
+(LiveCodeBench), **16** for knowledge (GPQA-Diamond); sampling temp **1.0** for
+math (0.6 for code on the 1.5B; temp 1.0 / top-p 0.95 / top-k −1 on the 3B).
+Budget ~64 samples at temp 1.0 for a stable AIME-class mean. Caveat: in
+VibeThinker, **Pass@K is the SFT *training target*** (post-training.md §9)
+while the **reported metric is avg@k mean-Pass@1** — do not conflate them.
+
+**Test-time scaling beyond majority vote — Claim-Level Reliability Assessment
+(CLR) `[paper 2606.16140]`.** A verification-based aggregation alternative to
+self-consistency: generate **K=32** candidate trajectories, extract **M=5**
+decision-relevant claims per trajectory, self-verify each claim into a binary
+verdict, score each trajectory by a nonlinear reliability `r_k =
+(mean_m v_{k,m})^M` (the power-M collapses a trajectory's weight if any single
+claim is unreliable), then cluster answers and pick the highest
+reliability-weighted group; run the whole flow 8× and average. Reported lift on
+the 3B: AIME26 94.3 → 97.1, AIME25 91.4 → 96.7. Useful as a release-stage
+option when correctness is verifiable claim-by-claim; costs ~K× generation, so
+weigh it against latency/cost (§6 product metrics).
+
 ## 8. Minimal eval suites (the deliverable)
 
 When a user asks "what should I actually run," hand them the right minimal set
@@ -219,7 +244,7 @@ for their stage. These are the floor, not the ceiling.
 | Instruction following | IFEval |
 | Dialogue preference | AlpacaEval 2, Arena-Hard, MT-Bench, human pairwise |
 | Factuality | SimpleQA, TruthfulQA, self-built fact QA |
-| Reasoning | MMLU-Pro, GPQA, MATH/AIME, BBH |
+| Reasoning | MMLU-Pro, GPQA, MATH/AIME, BBH (report avg@k mean-Pass@1; ~64 samples @ temp 1.0 for AIME-class — see §7) |
 | Chinese | C-Eval, CMMLU, AGIEval, SuperCLUE, self-built multi-turn |
 | Code | LiveCodeBench, SWE-bench Verified |
 | Tool / Agent | BFCL, τ-bench, WebArena, GAIA, BrowseComp |

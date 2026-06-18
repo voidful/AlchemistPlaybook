@@ -24,6 +24,18 @@ log-linearly at these ratios — undertraining is the common error, not
 overtraining. Rule for users: never train a from-scratch model below ~20
 tokens/param; go far above it for small deployed models.
 
+**Cheap post-training is a separate budget line `[paper 2511.06221]`.**
+Pretraining FLOPs are not the whole story for a small deployed model. The
+*entire post-training* of VibeThinker-1.5B (SFT + RLVR on top of an
+off-the-shelf Qwen2.5-Math-1.5B base) ran in **~3,900 NVIDIA H800 GPU-hours**,
+which the paper states as **under $8K** (≈$7,800 at an assumed
+**$2/GPU-hour** — label that rate as the paper's assumption, per the
+SKILL.md honesty rule). Planning anchor: turning a small base into a strong
+*reasoning* model can cost ~3,900 H800-hours / <$8K of post-training, separate
+from base pretraining — the recipe is SSP + MGPO (post-training.md §9–§10).
+VibeThinker-3B discloses **no** compute figure; do not extrapolate the 1.5B's
+cost to it.
+
 ## 2. Compute math
 
 Training FLOPs ≈ **6 × N × D** (N params, D tokens; forward 2ND + backward

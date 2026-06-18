@@ -3,8 +3,9 @@ name: alchemist-playbook
 description: >-
   Evidence-based training-recipe advisor ("煉丹調參") distilled from published
   training runs: LLaMA 1/2/3, OLMo 1/2/3, DeepSeek-V3, SmolLM2, MiniCPM,
-  Kimi K2 (MuonClip), LFM2 (Liquid AI, edge/hybrid + distillation), Pythia,
-  Zephyr/Alignment Handbook, Tulu 3, SimPO, ORPO,
+  Kimi K2 (MuonClip), LFM2 (Liquid AI, edge/hybrid + distillation),
+  VibeThinker 1.5B/3B (small-model reasoning: Spectrum-to-Signal, MGPO),
+  Pythia, Zephyr/Alignment Handbook, Tulu 3, SimPO, ORPO,
   QLoRA, Whisper, OWSM, wav2vec 2.0, HuBERT. Use this skill whenever the user
   asks about training hyperparameters (learning rate, batch size, warmup,
   scheduler, optimizer, beta, weight decay, epochs), debugging a training run
@@ -127,6 +128,10 @@ For sub-3B / on-device targets the highest-leverage levers are usually
 **distillation from a larger teacher** and **difficulty-ordered curriculum**,
 not these knobs — and a hybrid conv+attention backbone may beat an all-attention
 decoder under latency/memory budgets (LFM2). See `references/pretraining.md` §6–7.
+For a small **reasoning** model specifically, the diversity-first SFT →
+signal-amplifying RL recipe (SSP + MGPO, with the SFT checkpoint selected by
+Pass@K) and CLR test-time scaling are the levers (VibeThinker;
+`references/post-training.md` §9–10).
 
 ## Cross-stage LR ladder (~8B dense example)
 

@@ -55,6 +55,8 @@ Verification levels used across this skill:
 | LoRA | arXiv 2106.09685 | low-rank adaptation basics |
 | QLoRA | arXiv 2305.14314 | NF4 + double-quant + paged optimizers; r64/α16; lr 2e-4 (7–13B) / 1e-4 (33–65B); all-linear targeting |
 | LoRA learns less, forgets less | arXiv 2405.09673 | LoRA-vs-full-FT decision rule; higher-LR requirement |
+| VibeThinker-1.5B | arXiv 2511.06221 (HTML live at /html/2511.06221v1; v2 → 404) | Spectrum-to-Signal Principle (SFT=Pass@K diversity / RL=Pass@1 signal, select SFT checkpoint by Pass@K); Two-Stage Diversity-Exploring Distillation SFT (N=4 subdomains, Pass@K specialist selection, uniform-average fusion w_i=1/N; base Qwen2.5-Math-1.5B); MGPO = GRPO + max-entropy advantage reweight (target p₀=0.5, w=exp(−λ·D_ME); λ/G/RL-LR/KL not stated); avg@k mean-Pass@1 eval (64/8/16 samples, temp 1.0 math / 0.6 code, 40k max); ~3,900 H800-hr / <$8K post-training @ $2/hr; scores AIME24 80.3, AIME25 74.4, HMMT25 50.4, MATH-500 95.0, LCB V6 51.1, GPQA-D 46.7 |
+| VibeThinker-3B | arXiv 2606.16140 | Parametric Compression-Coverage Hypothesis (parameter-dense reasoning vs parameter-expansive knowledge) `[hypothesis]`; curriculum SFT (base Qwen2.5-Coder-3B, batch 128, LR 5e-5→8e-8 cosine, 5% warmup, 5+2 epochs, reference-model 8-rollout ≥0.75-error difficulty filter, ≥5K-token trace floor); single 64K-window multi-domain MGPO RLVR (math→code→STEM verifiers, no neural RM); Long2Short reward redistribution λ=0.2; offline self-distillation w/ learning-potential NLL trace selection; CLR test-time scaling (K=32, M=5, r=(mean v)^M); scores AIME26 94.3/97.1-CLR, LCB v6 80.2, LeetCode 96.1%, IFEval 93.4; RL hyperparameters + compute not stated |
 
 ## Speech
 
