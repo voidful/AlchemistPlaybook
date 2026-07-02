@@ -26,6 +26,7 @@ optimizer/architecture causes are real but rarer.
 | Speech model loops/hallucinates text | audio–text misalignment in data | CTC-confidence histogram | OWSM v4 cleaning pipeline (speech.md §3) |
 | Spikes after batch/seq-len jump | effective-LR shift at ramp boundary | did spike coincide with ramp? | brief LR re-warm after jumps `[heuristic]`; ramp earlier in training |
 | Grad-norm slowly trending up late in run | schedule not decaying (constant LR past intended budget); data shift | LR curve vs plan | start decay phase (WSD); inspect late data shards |
+| Agent SFT lifts in-domain but math/general regress | SFT distribution narrowing (documented −9.48 OOD, PivotRL paper) | OOD probes vs stage-input checkpoint | turn-level local RL on same trajectories (post-training.md §12); mix general data |
 
 ## Fast sanity tests (cheap, run before any expensive theory)
 

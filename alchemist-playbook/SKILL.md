@@ -3,7 +3,7 @@ name: alchemist-playbook
 description: >-
   Evidence-based training-recipe advisor (煉丹調參) distilled from published
   runs: LLaMA 1-3, OLMo 1-3, DeepSeek-V3, SmolLM2, MiniCPM, Kimi K2, GLM-5
-  (async agentic RL, DSA), LFM2, VibeThinker, Pythia, Zephyr, Tulu 3, SimPO,
+  (async agentic RL, DSA), PivotRL, LFM2, VibeThinker, Pythia, Zephyr, Tulu 3, SimPO,
   ORPO, QLoRA, Whisper, OWSM, wav2vec 2.0, HuBERT. Use whenever the user asks
   about training hyperparameters (learning rate, batch size, warmup,
   scheduler, optimizer, beta, weight decay, epochs), debugging a training run

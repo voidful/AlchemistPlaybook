@@ -15,6 +15,7 @@ report, `[reported]` secondary source.
 9. The Spectrum-to-Signal Principle (SSP): SFT = diversity, RL = signal
 10. Multi-domain RLVR, length control, and offline self-distillation
 11. Asynchronous agentic RL and cross-stage distillation (GLM-5)
+12. Turn-level local RL from SFT trajectories (PivotRL)
 
 ## 1. Algorithm chooser
 
@@ -32,6 +33,7 @@ report, `[reported]` secondary source.
 | Building a small **reasoning** model (math/code/STEM) | SSP: diversity-first SFT → signal-amplifying RL (§9–§10) | optimize SFT for Pass@K coverage and select the SFT checkpoint by Pass@K, then let MGPO/GRPO sharpen Pass@1 (VibeThinker) |
 | Long-horizon **agent** tasks (SWE, terminal, search) with slow/uneven rollouts | Asynchronous decoupled RL (§11) | synchronous RL stalls on straggler trajectories; GLM-5's async stack + stability mechanisms is the published recipe |
 | Sequential RL stages erode earlier capabilities | On-policy cross-stage distillation as the final stage (§11) | GLM-5 recovers SFT/Reasoning-RL/General-RL skills by distilling from each stage's checkpoint as teacher |
+| Have agent SFT trajectories but cannot afford full-trajectory RL; or agent SFT is tanking OOD ability | Turn-level local RL on the same trajectories (PivotRL, §12) | matches E2E-RL accuracy at 4× fewer rollout turns and removes SFT's OOD regression (NVIDIA/Nemotron-3) |
 
 ## 2. SFT recipes
 
@@ -382,3 +384,57 @@ generative RMs (robust, high variance) — across three objective tiers
 (foundational correctness → emotional intelligence → task-specific quality),
 plus **human-written exemplars as style anchors** to counter convergence
 toward "model-like" prose `[paper]`.
+
+## 12. Turn-level local RL from SFT trajectories (PivotRL)
+
+PivotRL `[paper 2603.21383, NVIDIA]` sits at the third point of the agent
+post-training triangle: SFT is cheap but degrades out-of-domain ability;
+end-to-end agent RL (§11) preserves OOD but pays for full-trajectory
+rollouts; PivotRL reuses **existing SFT trajectories** as RL states and pays
+only for single-turn rollouts. It is the production workhorse (alongside SFT
+and E2E RL) for Nemotron-3-Super-120B-A12B agentic post-training `[paper]`.
+
+The documented problem it fixes: on identical agent data (conversational
+tool use, agentic coding, terminal, search), SFT gained +9.94 in-domain but
+**−9.48 on OOD** (math, science QA, competitive coding); PivotRL gained
++14.11 in-domain with **+0.21 OOD** — no regression — and matched E2E RL on
+SWE-Bench with **4× fewer rollout turns** `[paper]`. Quote this to any user
+whose agent SFT is eroding general capability (diagnostics.md).
+
+Mechanism — two changes to naive "RL on demonstration turns", each fixing a
+measured bottleneck:
+
+1. **Pivot filtering (offline, before RL).** Split every SFT trajectory at
+   assistant-turn boundaries into (state, demonstrated-action) candidates.
+   Under the frozen reference policy, sample K local rollouts per state,
+   verifier-score them, and keep only states with **mixed outcomes**
+   (empirical reward variance > 0) **and** success mean below a difficulty
+   threshold λ_diff. Rationale is arithmetic, not taste: with binary rewards
+   and group-normalized advantages, an all-pass or all-fail group has
+   advantage ≡ 0 — they measured **71% of random turns yield zero gradient**
+   on τ²-bench/SWE-Bench. This is the offline sibling of MGPO's p₀=0.5
+   weighting (§5) and DAPO-style group filtering: all three spend compute
+   where outcome variance lives.
+2. **Functional-equivalence reward, not exact match.** Reward 1[action ∈
+   verifier-accepted set] — normalized string/schema check, task-specific
+   equivalence rule, or a lightweight LLM judge — instead of exact string
+   match with the demonstration. Exact-match local RL performed *worse than
+   SFT* (57.34 vs 58.44 on τ²-bench `[paper]`): many tool calls / shell
+   commands / queries are locally correct without reproducing the golden
+   string. Their theory: functional reward shifts probability mass onto the
+   acceptable-action set while preserving the reference policy's ordering
+   elsewhere — which is why OOD survives.
+
+Objective: standard GRPO-style clipped loss over G sampled actions per pivot
+state, group-normalized binary rewards, **plus β·KL to the frozen reference
+π₀** (kept, unlike GLM-5's reasoning RL — anchoring matters more when
+training states come from off-policy demonstrations). Numeric G, K, λ_diff,
+LR, and β are in the paper's appendix and were **not verifiable from the
+accessible text — do not invent them**.
+
+When to prefer which (agent post-training):
+- Own good trajectories + tight compute → PivotRL-style local RL.
+- Verifiable end-to-end environments + budget → E2E async RL (§11).
+- Both → GLM-5's ordering: SFT (error-masked) → reasoning RL → agentic RL,
+  with PivotRL-style turn-level training as the cheap middle step
+  `[heuristic — no published run combines all three yet]`.
