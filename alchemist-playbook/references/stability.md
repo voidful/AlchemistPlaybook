@@ -91,6 +91,15 @@ When a user reports a spike or NaN, walk this order:
   logit exceeds τ=100. K2 (1T-param MoE, 32B active) pretrained on 15.5T
   tokens with **zero loss spikes**; max logits hit the τ=100 cap early,
   then naturally decayed below it after ~30% of training.
+- **Muon Split** (GLM-5 `[paper 2602.15763]`): with MLA attention, Muon's
+  matrix orthogonalization applied to the whole fused up-projections
+  (W^UQ/W^UK/W^UV) underperformed GQA; splitting these matrices **per head**
+  and orthogonalizing each head's block independently let per-head weights
+  update at their own scales, closed the MLA-vs-GQA quality gap, and — the
+  stability payoff — kept attention-logit scale flat through a 28.5T-token
+  pretrain **without any clipping strategy**. Contrast with K2 above: both
+  are trillion-scale Muon+MLA runs; K2 bolted on QK-Clip (τ=100), GLM-5
+  restructured the orthogonalization so no clip was needed.
 - Guidance: for AdamW users with logit-growth symptoms, QK-norm (§4) is the
   established fix; QK-Clip is the Muon-ecosystem equivalent. Do not switch
   optimizer families mid-run.

@@ -34,6 +34,7 @@ Verification tags: `[config]` = read from official config/model card,
 | Kimi K2 `[paper]` | 1T MoE (32B active) | 15.5T | — | — | — | — | — | Muon + QK-Clip (τ=100): zero loss spikes; see stability.md |
 | LFM2 dense `[paper]` | 0.35–2.6B | 10T + 1T mid | not disclosed (distillation-driven) | — | accel. decay in midtrain | — | 4096 → 32768 | AdamW (0.9,0.95) wd 0.1 clip 1.0; hybrid gated short-conv + GQA (6–8 attn of 16–30 layers); distilled from LFM1-7B; ~10% input dropout; see §6 |
 | LFM2-8B-A1B MoE `[paper]` | 8B (1B active) | 12T + 1T mid | not disclosed | — | accel. decay in midtrain | — | 4096 → 32768 | 32 experts/layer, top-4; same hybrid backbone; edge/on-device target |
+| GLM-5 `[paper]` | 744B MoE (40B active) | 28.5T total = 27T pre + 1.55T mid + 20B DSA adapt | not disclosed (Muon family) | — | — | — | 4K → 200K | 256 experts, 80 layers (fewer layers to cut EP comm); MLA-256 (head dim 192→256, heads −1/3 for cheap decoding); Muon **Split** (stability.md §5); MTP with 3 parameter-shared layers (accept len 2.76); DSA sparse-attention retrofit (§7); INT4 QAT during SFT |
 
 Cross-checks worth quoting: tokens-per-parameter ranges from Chinchilla-optimal
 ~20 (Chinchilla 70B/1.4T) to heavily overtrained ~6500 (SmolLM2). Overtraining
@@ -112,6 +113,16 @@ homogeneous phase.
   data-quality evaluator: anneal a checkpoint on a candidate mix, measure.
 - **SmolLM2** `[paper]`: 4-stage mixture rebalancing across 11T tokens —
   math/code upweighted in later stages once general English saturates.
+- **GLM-5** `[paper]`: 27T-token pretrain @4K (code/reasoning prioritized
+  early) → three-stage long-context midtrain: **32K (1T tokens) → 128K
+  (500B) → 200K (50B)**, upsampling long documents and synthetic agent
+  trajectories in later stages. Agentic SWE midtrain data = repo-level
+  concatenation of issues + PRs + diffs + relevant files (~10M issue–PR
+  pairs, ~160B unique tokens). Two transferable findings: the extra 200K
+  stage *improved 128K performance* (training past the target length helps
+  at the target length), and long-context gains tracked data *diversity*
+  (NextLong/EntropyLong-style synthetic long-range dependencies + MRCR-like
+  multi-turn recall data at the 200K stage).
 
 Recipe guidance when a user asks "should I add my domain data during
 pretraining?": put small, high-quality, capability-targeted data in a
@@ -258,6 +269,29 @@ most token-mixing can be done by cheap short convs, with attention reserved
 for the few layers that need global context (≈2× faster decode at fixed
 quality). For server-side inference this trade rarely pays — keep full
 attention. Related families: Mamba/Jamba (SSM+attention), RWKV.
+
+**Sparse-attention retrofit — the DSA continued-pretraining recipe (GLM-5)
+`[paper 2602.15763]`:** you do not need to pretrain from scratch to get
+O(L²)-breaking attention. GLM-5 adopted DSA (DeepSeek Sparse Attention: a
+learned "lightning indexer" selects top-k=2048 KV entries per query,
+token-level sparsity on all layers) via CPT from the dense-attention base:
+1. **Indexer-only warm-up**: train *only* the indexer, base weights frozen —
+   GLM-5: 1000 steps × 14 seqs × 202,752 tokens, peak LR 5e-3 (high LR is
+   fine; only the tiny indexer trains). Their GLM-4.7-Flash replication:
+   1000 steps, batch 16.
+2. **Joint sparse adaptation**: unfreeze and co-train model + indexer on
+   midtrain data/hyperparameters — GLM-5 needed only **20B tokens** (their
+   small-scale run: 150B; DeepSeek-V3.2 used 943.7B) to match the dense
+   model on long-context benchmarks and tie its SFT loss curve.
+Their ablation hierarchy for efficient attention under continual adaptation
+(190B tokens @64K, half layers efficient): naive interleaved SWA =
+catastrophic on retrieval (−30 RULER@128K); search-based SWA layer selection
+recovers most of it; linear attention (GDN, and their SimpleGDN which reuses
+pretrained QKV weights with no extra parameters) is better still but always
+loses a few points on fine-grained retrieval; **DSA was the only lossless
+option** because it selects tokens rather than compressing state. Rationale
+they measured: ~90% of attention entries at long context are redundant;
+DSA cuts long-sequence attention compute ~1.5–2×.
 
 ## 8. Pre-launch checklist
 

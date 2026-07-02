@@ -14,6 +14,7 @@ report, `[reported]` secondary source.
 8. Model merging as a post-training stage
 9. The Spectrum-to-Signal Principle (SSP): SFT = diversity, RL = signal
 10. Multi-domain RLVR, length control, and offline self-distillation
+11. Asynchronous agentic RL and cross-stage distillation (GLM-5)
 
 ## 1. Algorithm chooser
 
@@ -29,6 +30,8 @@ report, `[reported]` secondary source.
 | Several good checkpoints, or capabilities to combine | Model merging (§8) | LFM2 runs soup/TIES/DARE/DELLA in parallel, evals, picks; near-free gains |
 | Training a sub-3B / on-device model | Distill first, then SFT→preference | distillation + curriculum beat optimizer tuning at small scale (pretraining.md §6) |
 | Building a small **reasoning** model (math/code/STEM) | SSP: diversity-first SFT → signal-amplifying RL (§9–§10) | optimize SFT for Pass@K coverage and select the SFT checkpoint by Pass@K, then let MGPO/GRPO sharpen Pass@1 (VibeThinker) |
+| Long-horizon **agent** tasks (SWE, terminal, search) with slow/uneven rollouts | Asynchronous decoupled RL (§11) | synchronous RL stalls on straggler trajectories; GLM-5's async stack + stability mechanisms is the published recipe |
+| Sequential RL stages erode earlier capabilities | On-policy cross-stage distillation as the final stage (§11) | GLM-5 recovers SFT/Reasoning-RL/General-RL skills by distilling from each stage's checkpoint as teacher |
 
 ## 2. SFT recipes
 
@@ -57,6 +60,12 @@ Rules that matter more than the LR:
   but treat 3+ as the exception, not the default.
 - **Packing**: pack short examples into full sequences with correct
   attention separation; verify by decoding a batch (diagnostics.md).
+- **Mask errors, keep them in context** (GLM-5 agent-trajectory SFT
+  `[paper]`): erroneous segments inside otherwise-good trajectories are
+  *retained in the input* but *excluded from the loss* — the model sees
+  mistakes and the recovery that follows, learning self-correction without
+  ever being trained to reproduce the mistake. Generalizes the prompt-mask
+  rule: loss-mask anything you want conditioned on but not imitated.
 - NEFTune (uniform noise on embedding, α=5/10/15) is a cheap sometimes-win
   for chat win-rates `[paper 2310.05914]`; off by default.
 
@@ -171,6 +180,31 @@ reusing the binary verifiable reward already present (no extra reward model),
 and a smooth differentiable alternative to DAPO-style hard pass-rate filtering
 (dropping all-correct/all-wrong groups). Note the 0.5 is the max-entropy
 *target* p₀, **not** an entropy or KL coefficient.
+
+**GLM-5 Reasoning RL (GRPO + IcePop-style mismatch masking, no KL)**
+`[paper 2602.15763]`: GRPO backbone with three deviations worth knowing.
+(1) **Train↔inference mismatch masking**: separate engines mean the sampling
+distribution ≠ training distribution; GLM-5 computes the per-token ratio
+ρ = π_train_old/π_infer_old and **zeroes the loss** for tokens with
+ρ ∉ [1/β, β], β=2 (IcePop mechanism). (2) **KL term removed entirely** to
+speed RL improvement — the mismatch mask plus on-policy sampling substitute
+for the anchor. (3) **Asymmetric PPO clip**: ε_low=0.2, ε_high=0.28
+(clip-higher, DAPO-style, keeps upside exploration). Fully on-policy,
+group size 32, batch 32. Mixed-domain RLVR (math / science / code /
+tool-integrated reasoning) trained *jointly* with roughly balanced mixture
+and binary outcome rewards — they report stable simultaneous gains in all
+four, a counterpoint to VibeThinker-3B's sequential domains (§10).
+Difficulty filtering mirror of SFT: keep problems the previous model
+(GLM-4.7) rarely solves but stronger teachers can.
+
+**Train–inference consistency is a first-class RL stability axis** (GLM-5
+`[paper]`): with sparse attention (DSA), a *non-deterministic* CUDA top-k in
+the indexer crashed RL within a few steps (entropy collapse, sharp
+performance drop); switching to deterministic `torch.topk` fixed it, and
+they freeze the indexer during RL. Same family as MoE routing replay. The
+general lesson for any RL stack: every stochastic/kernel-level divergence
+between rollout engine and trainer (top-k ties, tokenization round-trips,
+precision) is a latent RL killer — see also TITO in §11.
 
 RL guardrails: monitor KL to reference, mean reward, and response length
 together — reward↑ + KL↑ + length↑ is the hacking signature. Penalize
@@ -287,3 +321,64 @@ post-training moves (it shares the SSP/MGPO core with the 1.5B):
   band. This is an alternative to weight-space merging (§8) for unifying
   specialists: distill *behavior* instead of averaging *weights*. (Self-
   distillation LR/epochs/batch are **not stated**.)
+
+## 11. Asynchronous agentic RL and cross-stage distillation (GLM-5)
+
+GLM-5 `[paper 2602.15763]` is the most complete published recipe for RL on
+long-horizon agent tasks (SWE, terminal, multi-hop search; 10K+ verifiable
+environments). Two problems dominate: rollouts are *slow and wildly uneven*
+(GPU idle), and asynchrony makes training *off-policy* (instability). Their
+answers:
+
+**Throughput side (why async):** training and inference engines run on
+separate GPUs; inference generates continuously; a batch trains whenever
+enough trajectories accumulate; new weights push to rollout engines every K
+updates. A central Multi-Task Rollout Orchestrator (on the slime framework)
+registers each task's rollout/reward logic as a microservice, balances
+per-task sampling ratios, and sustains >1K concurrent rollouts. Tail-latency
+tricks that transfer: FP8 rollout inference, multi-token prediction (biggest
+win on small-batch stragglers), and prefill/decode disaggregation so heavy
+prefills never stall ongoing decodes; DP-aware routing pins each agent
+instance to one DP rank (consistent hashing) for KV-cache reuse.
+
+**Stability side (the checklist to steal):**
+- **Objective**: group-wise policy optimization — K traces per problem,
+  advantage = r − group mean; **environment/tool-output tokens excluded from
+  the loss** (optimize only what the model generated).
+- **TITO (token-in-token-out)**: the trainer consumes the rollout engine's
+  exact token IDs; never re-tokenize text round-trips. Re-tokenization
+  silently corrupts action↔reward alignment.
+- **Double-sided importance masking**: with rollout engines several updates
+  stale, tracking true π_old is infeasible; reuse the *rollout logprobs* as
+  the behavior policy, compute r_t = π_θ/π_rollout, and **zero out** tokens
+  with r_t ∉ [1−ε_l, 1+ε_h] (mask, not clip — simpler than IcePop and
+  stable without historical checkpoints).
+- **Staleness cut**: log which weight versions produced each trajectory;
+  drop samples whose oldest version lags the current policy by more than a
+  threshold τ.
+- **Environment-noise hygiene**: record failure causes; drop samples that
+  failed from sandbox/env crashes (not model error). For group methods,
+  pad the group by repeating valid samples if >half survive, else drop the
+  whole group — spurious negative rewards from broken environments are
+  reward noise, not signal.
+- **Optimizer reset** after each rollout-engine weight sync — each sync
+  redefines the optimization problem, so stale Adam moments mislead.
+
+**On-policy cross-stage distillation (final stage, anti-forgetting):**
+sequential stages (SFT → Reasoning RL → Agentic RL → General RL) each erode
+predecessors' skills. GLM-5's fix: a last pass where the *final checkpoints
+of earlier stages act as teachers* on their own training prompts, using the
+GRPO machinery with the advantage replaced by
+`Â = sg[log π_teacher(y_t|·) − log π_student(y_t|·)]` on student-sampled
+tokens (on-policy distillation). Group size drops to **1** (no group needed
+— the teacher gap *is* the advantage), batch 1024. This is the
+weight-free alternative to §8 merging and the multi-teacher generalization
+of §10's offline self-distillation: distill *behavior from every stage you
+cannot afford to forget*.
+
+GLM-5's General RL is also a useful reward-design reference: a **hybrid
+reward system** — rule-based checks + outcome RMs (low variance, hackable) +
+generative RMs (robust, high variance) — across three objective tiers
+(foundational correctness → emotional intelligence → task-specific quality),
+plus **human-written exemplars as style anchors** to counter convergence
+toward "model-like" prose `[paper]`.
