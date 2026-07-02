@@ -1,26 +1,20 @@
 ---
 name: alchemist-playbook
 description: >-
-  Evidence-based training-recipe advisor ("煉丹調參") distilled from published
-  training runs: LLaMA 1/2/3, OLMo 1/2/3, DeepSeek-V3, SmolLM2, MiniCPM,
-  Kimi K2 (MuonClip), LFM2 (Liquid AI, edge/hybrid + distillation),
-  VibeThinker 1.5B/3B (small-model reasoning: Spectrum-to-Signal, MGPO),
-  GLM-5 (DSA sparse-attention retrofit, Muon Split, asynchronous agentic RL,
-  cross-stage distillation),
-  Pythia, Zephyr/Alignment Handbook, Tulu 3, SimPO, ORPO,
-  QLoRA, Whisper, OWSM, wav2vec 2.0, HuBERT. Use this skill whenever the user
-  asks about training hyperparameters (learning rate, batch size, warmup,
+  Evidence-based training-recipe advisor (煉丹調參) distilled from published
+  runs: LLaMA 1-3, OLMo 1-3, DeepSeek-V3, SmolLM2, MiniCPM, Kimi K2, GLM-5
+  (async agentic RL, DSA), LFM2, VibeThinker, Pythia, Zephyr, Tulu 3, SimPO,
+  ORPO, QLoRA, Whisper, OWSM, wav2vec 2.0, HuBERT. Use whenever the user asks
+  about training hyperparameters (learning rate, batch size, warmup,
   scheduler, optimizer, beta, weight decay, epochs), debugging a training run
-  (loss spike, NaN, divergence, slow convergence, overfitting, unstable
-  gradients), designing a pretraining / SFT / DPO / RLHF / RLVR / agentic-RL / LoRA /
-  QLoRA / speech (ASR/TTS) recipe, choosing compute or token budgets, deciding
-  a knowledge-distillation / curriculum-learning / model-merging strategy,
-  training a small / on-device / edge model, deciding what to monitor or which
-  benchmarks / eval suite to run for a training stage (pretrain / mid-training
-  / post-training), catching capability regression or catastrophic forgetting,
-  or mentions 煉丹, 調參, 调参, "training recipe", "fine-tuning settings",
-  "what LR should I use", "evaluation / benchmark / eval suite", "release
-  gate" — even if they never say the word "hyperparameter".
+  (loss spike, NaN, divergence, slow convergence, overfitting), designing a
+  pretraining / SFT / DPO / RLHF / RLVR / agentic-RL / LoRA / QLoRA / speech
+  (ASR/TTS) recipe, compute or token budgets, distillation / curriculum /
+  model-merging strategy, small or on-device models, what to monitor or which
+  benchmarks / eval suite per stage, capability regression or catastrophic
+  forgetting, or mentions 煉丹, 調參, "training recipe", "fine-tuning
+  settings", "what LR should I use", "eval suite", "release gate" — even if
+  they never say "hyperparameter".
 ---
 
 # Alchemist Playbook
