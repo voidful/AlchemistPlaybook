@@ -16,6 +16,8 @@ report, `[reported]` secondary source.
 10. Multi-domain RLVR, length control, and offline self-distillation
 11. Asynchronous agentic RL and cross-stage distillation (GLM-5)
 12. Turn-level local RL from SFT trajectories (PivotRL)
+13. Multi-teacher on-policy distillation: unifying domain specialists (Agents-A1)
+14. Synthetic-data curation by feature coverage (FAC / SAE)
 
 ## 1. Algorithm chooser
 
@@ -34,6 +36,7 @@ report, `[reported]` secondary source.
 | Long-horizon **agent** tasks (SWE, terminal, search) with slow/uneven rollouts | Asynchronous decoupled RL (§11) | synchronous RL stalls on straggler trajectories; GLM-5's async stack + stability mechanisms is the published recipe |
 | Sequential RL stages erode earlier capabilities | On-policy cross-stage distillation as the final stage (§11) | GLM-5 recovers SFT/Reasoning-RL/General-RL skills by distilling from each stage's checkpoint as teacher |
 | Have agent SFT trajectories but cannot afford full-trajectory RL; or agent SFT is tanking OOD ability | Turn-level local RL on the same trajectories (PivotRL, §12) | matches E2E-RL accuracy at 4× fewer rollout turns and removes SFT's OOD regression (NVIDIA/Nemotron-3) |
+| Several *domain-specialist agents* must become one model; mixed-domain SFT is regressing IF/general ability | Domain teachers → multi-teacher on-policy distillation (§13) | Agents-A1: OPD repaired the multi-domain-SFT regressions weight merging can't route around |
 
 ## 2. SFT recipes
 
@@ -45,6 +48,8 @@ report, `[reported]` secondary source.
 | Llama-2-chat SFT | Llama-2 | 2e-5 | cosine | — | 2 | 64 seqs | 4096 | `[paper]` wd 0.1 |
 | SmolLM2 SFT | SmolLM2-1.7B | — | — | — | 2 | ~128 | 8192 | `[paper]` SmolTalk dataset; exact LR not re-verified — treat as `[reported]` |
 | LFM2 SFT | LFM2 base 0.35–8B | 3e-5 → 1e-7 | decay | — | 3 | per-size (micro 1 + accum) | 32768 | `[paper]` difficulty-curriculum-ordered data; base already distilled |
+| EvoLM SFT | myllama 1B / 4B (after math CPT) | 1e-5 / 7.5e-6 | cosine | ratio 0.1 | 1 (swept 1–32) | 128 | 2048 | `[config]` LLaMA-Factory YAML; full FT + ZeRO-3; math CoT distilled from Qwen2.5-Math-7B-Instruct |
+| Agents-A1 full-domain SFT | Qwen3.5-35B-A3B | 1e-5 | cosine + warmup | ratio 0.05 | 1 | 16 seqs | 131072 | `[paper]` Table 3; wd 0.1, response-token loss only, sample packing; ~100K agent trajectories avg 45K tokens |
 
 Rules that matter more than the LR:
 
@@ -59,7 +64,12 @@ Rules that matter more than the LR:
   selection follows, mild SFT overfitting can be acceptable. LFM2 ran **3
   epochs** on small models `[paper]` — defensible when the data is
   difficulty-curriculum-ordered (pretraining.md §6) and the model is small,
-  but treat 3+ as the exception, not the default.
+  but treat 3+ as the exception, not the default. EvoLM's controlled epoch
+  sweep (1B/4B, math, epochs ∈ {1,2,4,8,16,32}) quantifies the trade
+  `[paper 2506.16029]`: in-domain keeps rising to ~8 epochs, but **OOD
+  peaks at 2–4 epochs then declines**, and over-SFT'd checkpoints gain
+  *less* from subsequent RL (their Takeaways 7–8) — if RL follows, stop SFT
+  early rather than squeezing in-domain.
 - **Packing**: pack short examples into full sequences with correct
   attention separation; verify by decoding a batch (diagnostics.md).
 - **Mask errors, keep them in context** (GLM-5 agent-trajectory SFT
@@ -104,11 +114,24 @@ confirmation of the coupling — length-normalized ⇒ β≈5, standard ⇒
 behavior, the generalized form (relative term + absolute δ term) is more
 expressive than vanilla DPO at no extra model cost.
 
+**IPO** `[paper 2310.12036, Azar et al.]` — the other reference-model DPO
+variant worth knowing: replaces DPO's logistic loss with a **squared loss**
+pushing the log-ratio margin toward a fixed target (τ plays β's role). The
+objective is bounded, so it does not require the Bradley–Terry assumption
+and is more robust when preferences are **near-deterministic or noisy** —
+the regime where DPO overfits by driving margins to infinity. TRL ships it
+as `loss_type="ipo"`. Same warning as the β–loss-type coupling above: IPO's
+τ is *not* a DPO β — never transplant values across the two losses.
+
 DPO practical rules:
 - LR is the kill switch: 1e-5 reliably lobotomizes a 7–8B model into
   repetition (SimPO authors `[config]`). Grid 3e-7 / 5e-7 / 8e-7 / 1e-6.
 - Prefer **on-policy preference data annotated by a strong RM**: SimPO v0.2's
   jump came from re-annotating with ArmoRM, not from algorithm changes.
+  Labels from an AI annotator instead of humans (**RLAIF**, Constitutional-AI
+  lineage `[paper 2309.00267 / 2212.08073]`) are standard practice —
+  ArmoRM re-annotation above is exactly this pattern; the risk it inherits
+  is judge bias, so keep a small human-checked slice.
 - 1 epoch. Watch response length and a reasoning probe (GSM8K) for the
   classic verbosity / capability-tax failure.
 - Memory: policy + frozen reference both resident → gradient checkpointing
@@ -150,6 +173,24 @@ lr 3e-7 linear, eff. batch 224, episodes 100K, KL β=0.05, GAE λ=0.95,
 temp 1.0, max len 2048, no-EOS penalty −10, warmup 0. Rewards are
 *verifiable*: exact-match math, constraint checkers for IFEval-style
 prompts. Value model initialized from the reward model `[paper]`.
+
+**EvoLM PPO (small-scale RLVR, fully config-verified)** `[config —
+zhentingqi/evolm verl scripts + paper Table 8]`: actor lr 2e-6 (1B) /
+1e-6 (4B), critic lr = **10× the actor's** (2e-5 / 1e-5), KL coef 1e-4,
+**warmup-constant** LR schedule (the only stage in their pipeline without
+decay), batch 1024 (1B) / 2048 (4B) with mini-batch = batch, max
+prompt/response 1024/1024, binary verifiable math reward. The scaling
+findings are the citable part `[paper 2506.16029]`: gains saturate at
+**4–8 epochs or 50–100K examples**; past ~4 epochs the correct-ratio keeps
+rising while **Pass@16 degrades** — PPO *sharpens* the output distribution
+rather than expanding capability (the quantitative counterpart of §9's SSP
+claim that RL amplifies what SFT can already reach). Failure mode for the
+symptom table: scaling the RL *dataset* to 350–400K examples collapsed
+runs — response length grew until it exceeded the context window; scaling
+*epochs* instead was stable. And under a fixed downstream data budget,
+examples allocated to SFT buy in-domain at the cost of OOD while examples
+allocated to RL buy OOD (best OOD split in their sweep: 10K SFT / 90K RL)
+`[paper — Takeaway 11]`.
 
 **GRPO (DeepSeekMath)** `[paper]`: drop the value model; advantage = group-
 normalized reward over G samples per prompt. lr 1e-6, KL coef 0.04, G=64
@@ -222,6 +263,8 @@ missing EOS (Tulu 3's −10) to prevent run-on generations.
 | GSM8K drops after DPO | chat-data preference shift | add SFT-loss term (costs chat) or mix math prefs; Tulu 3 mixes targeted prefs |
 | SFT model parrots prompts | loss not masked | mask prompt tokens (Llama 2) |
 | RM score up, humans unimpressed | reward hacking | verifiable rewards, KL watch, fresh on-policy evals |
+| RL run collapses; responses grow until they hit the context window | RL dataset scaled far past saturation | scale RL *epochs*, not dataset size (EvoLM: collapse at 350–400K examples; saturation 4–8 ep / 50–100K) |
+| Multi-domain agent SFT regresses IF / general QA | conflicting reasoning patterns in one SFT mix (single-turn long-thinking vs multi-turn tool-use) | domain teachers + multi-teacher OPD (§13, Agents-A1) |
 
 ## 7. Evaluation discipline
 
@@ -262,7 +305,11 @@ When to reach for each:
 
 Always evaluate the merge against **each input model on every axis you care
 about** — merging can silently trade one capability for another. `mergekit`
-is the standard tooling `[reference]`.
+is the standard tooling `[reference]`. When the specialists are *agents*
+with conflicting reasoning patterns (not near-equivalent checkpoints),
+weight-space merging has no published success — the working recipe is
+multi-teacher on-policy distillation with domain routing (§13, Agents-A1;
+"teachers are not merged at the parameter level" `[paper]`).
 
 ## 9. The Spectrum-to-Signal Principle (SSP): SFT = diversity, RL = signal
 
@@ -395,11 +442,21 @@ only for single-turn rollouts. It is the production workhorse (alongside SFT
 and E2E RL) for Nemotron-3-Super-120B-A12B agentic post-training `[paper]`.
 
 The documented problem it fixes: on identical agent data (conversational
-tool use, agentic coding, terminal, search), SFT gained +9.94 in-domain but
-**−9.48 on OOD** (math, science QA, competitive coding); PivotRL gained
-+14.11 in-domain with **+0.21 OOD** — no regression — and matched E2E RL on
-SWE-Bench with **4× fewer rollout turns** `[paper]`. Quote this to any user
-whose agent SFT is eroding general capability (diagnostics.md).
+tool use, agentic coding, terminal, search; base
+Qwen3-30B-A3B-Thinking-2507), SFT gained +9.94 in-domain but **−9.83 on
+OOD** (average over 8 benchmarks — IFBench, AIME25, MATH500, LiveCodeBench,
+SciCode, MMLU-Pro/ProX, WMT24++; Table 2. The paper's intro says −9.48
+once — an internal inconsistency; the abstract's +10.04 gap confirms
+−9.83). PivotRL gained +14.11 in-domain with **+0.21 OOD**, worst
+single-benchmark drop −3.12 vs SFT's worst of **−64.48** (AIME25 after
+terminal-domain SFT), and matched E2E RL on SWE-Bench (32.67%) with **~4×
+fewer rollout turns and ~5.5× less wall-clock** `[paper]`. Quote this to
+any user whose agent SFT is eroding general capability (diagnostics.md).
+Two honest nuances: in-domain PivotRL is *not* uniformly better — SFT beat
+it on SWE-Bench in-domain (37.40 vs 32.67); the win is the OOD + compute
+profile. And reported in-domain numbers are **best-checkpoint ("peak")
+values, not final-step** `[paper — Table 3/6 captions]` — mind that when
+comparing against papers that report final checkpoints.
 
 Mechanism — two changes to naive "RL on demonstration turns", each fixing a
 measured bottleneck:
@@ -423,14 +480,34 @@ measured bottleneck:
    commands / queries are locally correct without reproducing the golden
    string. Their theory: functional reward shifts probability mass onto the
    acceptable-action set while preserving the reference policy's ordering
-   elsewhere — which is why OOD survives.
+   elsewhere — which is why OOD survives. The verifier can be surprisingly
+   coarse and still work: their SWE-Bench local verifier matches the
+   **tool-call name only** (search/open/edit/run — no argument or patch
+   checking; final success still judged by the full harness), while
+   Terminal-Bench used schema validation + normalized string similarity +
+   an equivalence LLM-judge `[paper — App. A.2]`.
 
 Objective: standard GRPO-style clipped loss over G sampled actions per pivot
 state, group-normalized binary rewards, **plus β·KL to the frozen reference
 π₀** (kept, unlike GLM-5's reasoning RL — anchoring matters more when
-training states come from off-policy demonstrations). Numeric G, K, λ_diff,
-LR, and β are in the paper's appendix and were **not verifiable from the
-accessible text — do not invent them**.
+training states come from off-policy demonstrations). Verified numerics
+(Appendix A.2, SWE-Bench run): **G=16**, batch 1024 = 64 prompts × 16
+generations at 1 turn/sample, reaching 32.67% at step ~130 with ~133K
+cumulative rollout turns — vs the E2E-RL baseline's batch 512 = 16 prompts
+× G=32 at 12–25 turns/trajectory, ~542K turns to the same score. **K (the
+offline profiling rollout count), λ_diff, LR, β, and clip ε are still not
+stated anywhere in v1 — do not invent them.**
+
+Monitoring signal worth stealing for *any* group-normalized RL run:
+**per-batch reward standard deviation**. Their Theorem 3.2 shows the
+population GRPO learning signal scales as √Var(r)/β² — reward variance *is*
+the gradient's natural scale. Empirically, training on random turns let
+batch reward-std collapse toward ~0.35 while the pivot-filtered set held
+~0.50 across ~600 steps, tracking validation accuracy `[paper — figure-read
+values]`. If reward-std is collapsing, the data has stopped teaching:
+re-filter for mixed-outcome prompts. (This, MGPO's p₀=0.5 weighting (§5),
+DAPO group filtering, and Agents-A1's 5-retry mixed-outcome filter (§13)
+are the same lever in four guises.)
 
 When to prefer which (agent post-training):
 - Own good trajectories + tight compute → PivotRL-style local RL.
@@ -438,3 +515,109 @@ When to prefer which (agent post-training):
 - Both → GLM-5's ordering: SFT (error-masked) → reasoning RL → agentic RL,
   with PivotRL-style turn-level training as the cheap middle step
   `[heuristic — no published run combines all three yet]`.
+
+## 13. Multi-teacher on-policy distillation: unifying domain specialists (Agents-A1)
+
+Agents-A1 (Shanghai AI Lab `[paper 2606.30616]`; 35B-A3B MoE initialized
+from Qwen3.5-35B-A3B) is the published recipe for the "several specialists
+→ one model" problem when the specialists are *agents* spanning
+heterogeneous domains (deep research, MLE/coding, science, instruction
+following, long-context, tool use). Three stages:
+
+1. **Full-domain SFT** — lr 1e-5, cosine + warmup ratio 0.05, batch 16
+   seqs, 1 epoch, max seq **131,072**, AdamW wd 0.1, loss on response
+   tokens only, sample packing; ~100K trajectories averaging **45K tokens**
+   (per-domain 3K–48K) `[paper — Tables 2–3]`. Documented failure mode:
+   this mixed-domain SFT *regressed* IFBench 70.2 → 68.7 and
+   HLE-with-tools 47.4 → 41.6 vs the base — attributed to conflicting
+   reasoning patterns (single-turn long-thinking vs multi-turn tool-use
+   short-thinking) `[paper — Table 4]`. If your multi-domain agent SFT
+   shows the same signature, this is the precedent.
+2. **Domain-level teachers** — branch per-domain SFT or GRPO-RL runs off
+   the SFT checkpoint. The search teacher's RL config is fully published
+   `[paper §4.2.1]`: GRPO, **constant lr 1e-6**, 32 prompts × **G=8**
+   rollouts = batch 256, **asymmetric clip [0.2, 0.28]** (the same
+   clip-higher as GLM-5/DAPO, §5), **KL 0.001 kept** (unlike GLM-5's
+   no-KL), entropy coef 1e-4, max response 4,096, rollout temp 1.0, ≤300
+   tool calls/rollout, rollout logprobs used for advantage (§11's
+   consistency family). RL data: ~2,000 multi-hop questions kept only if 5
+   attempts yield BOTH correct and incorrect trajectories — the
+   mixed-outcome filter again (§12). The tool-use teacher adds
+   **asymmetric process rewards** (PAPO-style): Â = Â_out +
+   λ·1[r_out=0]·Â_proc with **λ=0.5**, rubric-based process advantage
+   applied to *failed* trajectories only (on successes it double-counts the
+   outcome signal) `[paper — Eq. 7–8]`; its hard-task RL set is just **64
+   near-miss samples**, deliberately reused across steps. The IF teacher
+   runs two consecutive GRPO stages with dynamic sampling (uniform-reward
+   groups dropped).
+3. **Multi-teacher on-policy distillation (OPD)** — the student generates
+   rollouts (a *frozen* rollout copy generates; a separate optimized copy
+   receives gradients); each sample is supervised by *its domain's teacher
+   only* — hard routing, never a soft teacher mixture, never parameter
+   merging. Loss = **truncated reverse KL on the teacher's top-k support**,
+   both distributions renormalized on that support ("salient vocabulary
+   alignment"), tool-output/user tokens masked, losses normalized within
+   each domain before averaging across domains so no domain dominates.
+   Diagnostic they monitor: student probability mass on the teacher's top-k
+   set. Rollouts hitting turn/length/context budgets are marked TRUNCATED
+   and kept as valid prefixes; system-crashed ones are retried (cf. §11's
+   env-noise hygiene). Result: the SFT-stage regressions repair (IFBench
+   80.6, HLE 47.6) and one student roughly matches its teachers — though
+   not always exceeding them (IFBench 80.6 vs teacher's 82.0) `[paper]`.
+
+Position it among the unification tools: §8 merges *weights* (needs a
+shared ancestor; can silently trade capabilities), §10 distills *offline*
+from verified trajectories, GLM-5 (§11) distills on-policy from its own
+*earlier stages*; Agents-A1 distills on-policy from *parallel domain
+teachers* with hard routing. Caveats before citing: the OPD stage's
+LR/batch/top-k are **not stated**; and the paper is internally inconsistent
+in places (the search teacher's GAIA gain appears as both 85.4 and 95.1;
+the reproduced τ²-bench baseline as 32.53/33.0) — quote Table values and
+name the table.
+
+## 14. Synthetic-data curation by feature coverage (FAC / SAE)
+
+"Less is Enough" (FAC Synthesis, ICML 2026 `[paper 2602.10388 +
+Zhongzhi660/FAC-Synthesis repo]`) supplies the measurement layer for the
+"data beats hyperparameters" principle: **the diversity that matters is
+coverage in the *model's own feature space*, not surface variety.**
+
+- **The metric (FAC).** Train a Top-K SAE on mid-depth activations (~50%
+  layer: layer 16 of LLaMA-3.1-8B / Mistral-7B, 14 of Qwen2-7B), have an
+  annotator LLM label which features are task-relevant, and score a
+  dataset by which of those features it activates. FAC tracks downstream
+  results at Pearson 0.95 (toxicity) / 0.85 (reward modeling) / 0.72–0.88
+  (steering, instruction following), while the classic diversity metrics
+  **anti-correlate**: Distinct-1/2 r ≈ −0.58/−0.33, POS-tag Distinct-2
+  −0.66; bigram entropy (+0.57) is the only decent generic signal `[paper —
+  Table 8, App. L.8]`. If you gate synthetic data on Distinct-n today, you
+  may be selecting for *worse* data.
+- **The synthesis loop.** Identify task-relevant features *missing* from
+  the seed set vs an anchor corpus → per missing feature, build a
+  contrastive strong/weak activation pair, use it as a few-shot demo, and
+  SAE-filter the candidates (two-step beats one-step direct prompting at
+  every threshold: 81.8% vs 69.6% FAC at δ=0) → **one sample per missing
+  feature is the efficient point** — data-efficiency falls monotonically
+  from 2–5 samples/feature, and with coverage fixed, padding the set to
+  200 samples adds only ~+0.5% `[paper — §6, §7.3, Fig. 4/7]`. Coverage,
+  not count, drives the gains.
+- **Results at very small budgets**: 200 samples → +23.63 AUPRC toxicity;
+  300 → +13.32 reward-model accuracy; 2,000 → AlpacaEval 2.0 parity with
+  MAGPIE's 300K samples (**150× less data**) `[paper — Table 1, Fig. 1]`.
+  Known limit: barely moves GSM8K / LiveCodeBench (+0.0–1.5) — single-layer
+  SAE features under-capture multi-step reasoning; don't buy this for
+  reasoning data.
+- **Generator choice**: the *backbone-aligned* generator
+  (LLaMA-3.1-8B-Instruct, temp 0.8, top-p 0.9) beat GPT-4o-mini as data
+  generator **at every temperature** — alignment with the student's
+  feature space matters more than raw generator strength `[paper — Table
+  4]`. Features also transfer across families, weak-to-strong: LLaMA-derived
+  features improved Qwen2 by +1.6–5.1 more than Qwen2's own `[paper —
+  Table 3]`.
+- **SAE cost is one-time and small**: 2^16 dictionary, K=20, ~113M tokens,
+  3 epochs, AdamW 1e-3, batch 512 ≈ **4.4 h on 4×H100**, reusable across
+  tasks `[paper — App. J/L.3]`. Honesty caveats from the repo audit: the
+  released script differs from the paper text (plain Adam not AdamW, top-K
+  annealed 200→20, default 5 epochs) and the toxicity fine-tune script is
+  not runnable as published — treat repo numbers as `[config]` *with that
+  flag*, and the paper's Table values as the citable ones.

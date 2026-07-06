@@ -3,7 +3,10 @@ name: alchemist-playbook
 description: >-
   Evidence-based training-recipe advisor (煉丹調參) distilled from published
   runs: LLaMA 1-3, OLMo 1-3, DeepSeek-V3, SmolLM2, MiniCPM, Kimi K2, GLM-5
-  (async agentic RL, DSA), PivotRL, LFM2, VibeThinker, Pythia, Zephyr, Tulu 3, SimPO,
+  (async agentic RL, DSA), PivotRL, Agents-A1 (multi-teacher on-policy
+  distillation), EvoLM (full-pipeline ablations), LFM2, VibeThinker,
+  Program-as-Weights, FAC-Synthesis (SAE data curation), Pythia, Zephyr,
+  Tulu 3, SimPO,
   ORPO, QLoRA, Whisper, OWSM, wav2vec 2.0, HuBERT. Use whenever the user asks
   about training hyperparameters (learning rate, batch size, warmup,
   scheduler, optimizer, beta, weight decay, epochs), debugging a training run
@@ -37,7 +40,10 @@ like a doctor, prescribe like an engineer, and cite like a researcher.
 3. **Data beats hyperparameters.** FineWeb, OWSM v4, and SmolLM2 each showed
    data cleaning/mixing improvements that dwarf any optimizer tweak. When a
    run underperforms and the config looks sane, route suspicion to data
-   first (see references/diagnostics.md triage order).
+   first (see references/diagnostics.md triage order). For *synthetic* data,
+   measure diversity as model-feature coverage, not Distinct-n — surface
+   diversity anti-correlates with downstream results (FAC;
+   references/post-training.md §14).
 4. **Token-based accounting.** Express batch size in tokens, budgets in
    tokens, warmup in steps *and* tokens. `tokens/step = n_gpu ×
    micro_batch × seq_len × grad_accum`. Use `scripts/estimate.py` for all
@@ -114,7 +120,7 @@ Peak pretraining LR by dense model size (AdamW, standard parametrization):
 
 | Size | Peak LR | Verified examples |
 | --- | --- | --- |
-| 100M–2B | 4e-4 – 1e-3 | SmolLM2-1.7B 5e-4 (11T tokens), OLMo-1B 4e-4 |
+| 100M–2B | 2e-4 – 1e-3 | SmolLM2-1.7B 5e-4 (11T tokens), OLMo-1B 4e-4, EvoLM-1B 2e-4 (config-verified) |
 | 7–13B | 3e-4 | LLaMA-7B/13B, OLMo-1/2 7B and 13B (config-verified) |
 | 30–70B | 1.5e-4 – 6e-4 | LLaMA-33B/65B and Llama-2-70B 1.5e-4; OLMo-2-32B 6e-4 (newer stability stack + 8M batch) |
 | ~405B | 8e-5 | Llama 3 405B (warmup 8000, cosine to 8e-7 over 1.2M steps) |

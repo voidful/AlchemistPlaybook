@@ -35,6 +35,7 @@ Verification tags: `[config]` = read from official config/model card,
 | LFM2 dense `[paper]` | 0.35–2.6B | 10T + 1T mid | not disclosed (distillation-driven) | — | accel. decay in midtrain | — | 4096 → 32768 | AdamW (0.9,0.95) wd 0.1 clip 1.0; hybrid gated short-conv + GQA (6–8 attn of 16–30 layers); distilled from LFM1-7B; ~10% input dropout; see §6 |
 | LFM2-8B-A1B MoE `[paper]` | 8B (1B active) | 12T + 1T mid | not disclosed | — | accel. decay in midtrain | — | 4096 → 32768 | 32 experts/layer, top-4; same hybrid backbone; edge/on-device target |
 | GLM-5 `[paper]` | 744B MoE (40B active) | 28.5T total = 27T pre + 1.55T mid + 20B DSA adapt | not disclosed (Muon family) | — | — | — | 4K → 200K | 256 experts, 80 layers (fewer layers to cut EP comm); MLA-256 (head dim 192→256, heads −1/3 for cheap decoding); Muon **Split** (stability.md §5); MTP with 3 parameter-shared layers (accept len 2.76); DSA sparse-attention retrofit (§7); INT4 QAT during SFT |
+| EvoLM `[config]` | 0.5/1/4B | 10–320B (swept) | 2.5e-4 / 2e-4 / 1.5e-4 | ratio 0.1 | cosine → 10% | 512 seqs (0.5/1B) / 1024 (4B) × 2048 ≈ 1–2M tokens | 2048 | AdamW (0.9,0.95) wd 0.1 clip 1.0, bf16-mixed, FineWeb-Edu; 100+-run controlled full-pipeline ablation (LLaMA arch, GQA 4 groups); downstream saturation ~80–160 tok/param (scaling-and-batch.md §1); CPT replay ablation in §4 |
 
 Cross-checks worth quoting: tokens-per-parameter ranges from Chinchilla-optimal
 ~20 (Chinchilla 70B/1.4T) to heavily overtrained ~6500 (SmolLM2). Overtraining
@@ -124,13 +125,25 @@ homogeneous phase.
   (NextLong/EntropyLong-style synthetic long-range dependencies + MRCR-like
   multi-turn recall data at the 200K stage).
 
+- **EvoLM (the controlled CPT data point)** `[config/paper 2506.16029]`:
+  CPT re-warms the LR to the **full pretraining peak** (2e-4, warmup ratio
+  0.1, fresh cosine to 10%) — config-verified, not a reduced-LR restart.
+  Replay is **non-monotonic**: on a 50B-token FineMath CPT over a
+  160B-token 1B base, **8B tokens of FineWeb-Edu replay (16% of the CPT
+  mix, ≈5% of the pretraining budget) beat no replay AND beat both smaller
+  (1.6B) and larger (16B) replay** on downstream math after SFT (Pass@1
+  21.01 vs 19.27 / 16.21 / 15.22). More replay is not automatically safer —
+  it displaces target-domain tokens.
+
 Recipe guidance when a user asks "should I add my domain data during
 pretraining?": put small, high-quality, capability-targeted data in a
 **late anneal stage with decaying LR**, not uniformly through the run.
 For continued-pretraining of an existing base: 10–100B tokens with a fresh
-warmup (shorter, e.g., a few hundred steps) and cosine/WSD decay to ~0,
-mixing ~10–30% of original-distribution data to limit forgetting
-`[heuristic anchored to OLMo 2 stage-2 / Llama 3 anneal practice]`.
+warmup and cosine/WSD decay, mixing original-distribution replay to limit
+forgetting — EvoLM's controlled point above says ~5–15% replay, tuned, and
+warns against reflexively going higher; the older 10–30% band from OLMo 2
+stage-2 / Llama 3 anneal practice is the upper limit, not the default
+`[EvoLM config-verified; band remains heuristic]`.
 
 **Evaluating a midtraining/anneal stage is a Pareto problem, not a single
 number.** The success criterion is `target capability ↑ − general capability

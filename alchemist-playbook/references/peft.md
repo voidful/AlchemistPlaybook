@@ -9,6 +9,7 @@ Verification tags: `[config]`, `[paper]`, `[reported]`.
 4. Memory math
 5. LoRA + DPO
 6. Pitfalls checklist
+7. Hypernetwork-generated LoRA (Program-as-Weights)
 
 ## 1. LoRA vs full FT
 
@@ -25,13 +26,20 @@ regularizer toward the base model. Decision rule:
   accept some gap).
 - Preserving base capabilities is itself a goal → LoRA's forgetting
   resistance is a feature.
+- **Scarce supervision (~hundreds of labeled examples) → restrict trainable
+  capacity.** FAC's controlled trainable-scale ablation at ~200 samples
+  `[paper 2602.10388]`: LoRA (41M params) 62.60 AUPRC > head-only (8K)
+  49.12 > last-1/2-layers (218/436M) 47.19/45.79 > **full FT (7.5B)
+  collapses to 29.02** — large-scale parameter updates amplify spurious
+  correlations when data is tiny. In this regime LoRA is not a memory
+  hack, it *is* the regularizer; full FT needs data volume.
 
 ## 2. LoRA hyperparameters
 
 | Knob | Recommendation | Evidence |
 | --- | --- | --- |
 | Target modules | **All linear layers**: q,k,v,o + gate,up,down. This matters more than rank. | QLoRA ablation: all-linear needed to match full FT `[paper]`; 2405.09673 concurs |
-| Rank r | 16–64 for SFT-style adaptation; 64+ (even 256) for CPT-like jobs | QLoRA used r=64 `[paper]`; 2405.09673 swept 16–256 |
+| Rank r | 16–64 for SFT-style adaptation; 64+ (even 256) for CPT-like jobs | QLoRA used r=64 `[paper]`; 2405.09673 swept 16–256; PAW's controlled per-task baselines at 0.6B: r=128 (0.516) ≤ r=64 (0.521) — rank saturates, don't buy past 64 by default `[paper 2607.02512]` |
 | α | α=16 with r=64 (QLoRA convention) or α=2r rule | `[paper]` / `[heuristic]` |
 | Dropout | 0.05 (33–65B) / 0.1 (7–13B) | QLoRA `[paper]` |
 | LR | 1e-4 – 3e-4; start 2e-4 (7–13B), 1e-4 (33–65B) | QLoRA `[paper]` |
@@ -93,3 +101,39 @@ numerics match deployment.
    batch and one eval prompt; compare token IDs.
 6. r raised but α left tiny → effective scale α/r collapsed; keep α/r
    roughly constant when changing r.
+
+## 7. Hypernetwork-generated LoRA (Program-as-Weights)
+
+PAW `[paper 2607.02512]` trains a 4B "compiler" (Qwen3-4B-Instruct-2507,
+fully unfrozen) that reads a natural-language task spec and **emits a LoRA
+adapter** (r=64, all 7 linear modules, shared bases, ~38.5M params per
+task) for a frozen 0.6B interpreter. Single SFT-style objective — NLL of
+the target output under the frozen interpreter wearing the generated
+adapter; an earlier RL stage was tried and *deleted* (it mode-collapsed to
+one output format regardless of seed prompt). Training config `[paper —
+App. G]`: lr 2e-5, AdamW at PyTorch defaults, **no warmup, no schedule**,
+batch 16 × accum 3 = 48 effective, 3 epochs over 10M synthetic examples,
+bf16 with the adapter-emitting mapper head kept in **fp32 for numerical
+stability** (the hypernet analogue of stability.md §6's "fp32 where it
+counts").
+
+What a PEFT user can reuse even without building the hypernetwork:
+
+- **Controlled same-data hierarchy** (exact match, 0.6B interpreter):
+  generated-LoRA 0.738 > full FT 0.584 > fixed LoRA r=64 0.521 ≥ r=128
+  0.516 > r=18 0.424. Two citable points: rank saturates by 64 (§2), and
+  when the workload is *many small disjoint tasks*, per-task adapter
+  capacity beats one shared full fine-tune.
+- **Simplest adapter-generator wins**: every "more expressive" mapper
+  variant (per-position aggregation, per-layer bases, adding
+  prefix-tuning) underperformed plain mean-pool + shallow residual MLP +
+  shared bases `[paper — Table 4]`. Same lesson at hyper-scale as OLMo 2's
+  plain-init story.
+- **Quantized deployment is measurably cheap**: Q6_K base + Q4_0 adapter
+  statistically matched bf16; Q4_K_M base lost 1.3 points at ~507 MB total
+  disk `[paper — Table 8]`. They evaluated the *shipped quantized
+  artifact* — which is exactly pitfall #4's rule done right.
+- Synthetic-eval hygiene: their test set keeps only examples where **two
+  independent strong models agree** on the target, and reports the
+  generator model's own score (96.1%) as the empirical ceiling — see
+  evaluation.md §9.

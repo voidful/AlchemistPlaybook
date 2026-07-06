@@ -24,6 +24,22 @@ log-linearly at these ratios — undertraining is the common error, not
 overtraining. Rule for users: never train a from-scratch model below ~20
 tokens/param; go far above it for small deployed models.
 
+**Where overtraining stops paying for *post-training* (EvoLM)** `[paper
+2506.16029]`: a controlled 0.5–4B sweep (10–320B tokens on FineWeb-Edu,
+the full CPT→SFT→RL pipeline re-run at every budget) found
+downstream-relevant saturation at **~80–160 tokens/param** (≈4–8×
+Chinchilla) — and past ~160×, *post-trained OOD* metrics (Maj@16, RM@16,
+Pass@16) actually declined while in-domain only inched up (ID Maj@16: 8% →
+15% from 20→80B tokens, then just 17% at 320B). This does not overturn the
+overtraining doctrine above — LLaMA/SmolLM2 optimize base quality per
+inference dollar, and EvoLM's own 320B-token 1B matched TinyLlama-1B (2T
+tokens) upstream with ~6× less data — but it bounds it: don't expect base
+token-scaling to keep buying post-training headroom past ~100×/param;
+budget the marginal compute into CPT/post-training instead. Corollary for
+budget comparisons: mid-run checkpoints of a long cosine run are **not**
+substitutes for completed shorter runs — compare finished schedules only
+(that is what WSD in §6 makes cheap).
+
 **Cheap post-training is a separate budget line `[paper 2511.06221]`.**
 Pretraining FLOPs are not the whole story for a small deployed model. The
 *entire post-training* of VibeThinker-1.5B (SFT + RLVR on top of an

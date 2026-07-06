@@ -34,7 +34,7 @@ plainly because they are properties of the benchmark, not opinions.
 | Capability regression eval | is the checkpoint stronger / forgetting? | every N tokens / per epoch | frozen val slices + cheap downstream probes |
 | Release gate eval | decide go / no-go for ship | before release | full public benchmarks + private holdout + product/safety |
 
-Two rules that prevent most eval mistakes:
+Three rules that prevent most eval mistakes:
 - **Public benchmarks are for horizontal comparison; a private holdout eval is
   the release gate.** Public sets leak into training data over time
   (contamination); only a freshly-built, never-published holdout can gate a
@@ -42,6 +42,12 @@ Two rules that prevent most eval mistakes:
 - **Compare each stage against its *stage input* model, not just the final
   target.** Each stage must independently justify itself — Tulu 3's per-stage
   delta tables are the model to imitate `[paper]`.
+- **Compare completed LR schedules, not mid-course snapshots.** EvoLM: a
+  checkpoint taken at 20B tokens *inside* a 320B-token cosine run scores
+  measurably differently from a completed 20B run — budget comparisons are
+  only valid like-for-like, each run with its own finished schedule
+  `[paper 2506.16029]`. WSD decay branches exist precisely to make this
+  cheap (scaling-and-batch.md §6).
 
 ## 2. Pre-training: what to monitor
 
@@ -157,6 +163,16 @@ refuses benign ones (over-refusal) has not been aligned, it has been crippled.
 The reward-hacking signature is **reward ↑ + KL ↑ + length ↑ together** — track
 all three on one plot (post-training.md §5 RL guardrails).
 
+**Unsupervised validation signal for post-training checkpoints (EvoLM)**
+`[paper 2506.16029]`: validation loss is a poor model-selection signal
+after SFT/RL — post-trained models are miscalibrated, so lower NLL stops
+tracking accuracy. Their fix: score rollouts with an off-the-shelf
+**outcome reward model** (Skywork-Reward-Llama-3.1-8B-v0.2, averaged over
+16 samples) and select on mean ORM score — it tracked downstream accuracy
+far better than val loss, even with an 8B RM judging 1B policies (their
+Takeaway 12). Cheap to add to this table's dashboard when no verifiable
+reward exists.
+
 ## 7. Benchmark catalog by capability (post-training / release)
 
 | Capability | Benchmarks | Metric |
@@ -269,3 +285,26 @@ Honesty rules specific to evaluation:
 - LLM-judge scores (MT-Bench, AlpacaEval) are relative, not absolute, and
   drift with the judge model — report the judge and version, prefer pairwise.
 - Never tune on the release-gate holdout. The moment you do, it stops gating.
+- **Synthetic test sets need an agreement gate and a ceiling.** PAW filters
+  eval examples to those where two independent strong models agree on the
+  target, and reports the data-generating model's own score (96.1%) as the
+  empirical ceiling for anything trained on that data `[paper 2607.02512]`.
+  Never report a synthetic-benchmark number without its ceiling.
+- **Surface-diversity metrics are not data-quality gates.** In FAC's
+  controlled study, Distinct-1/2 and POS-tag diversity *anti-correlated*
+  with downstream results (r ≈ −0.33…−0.66) while model-feature-space
+  coverage correlated at r ≈ 0.93 `[paper 2602.10388]`. Gate synthetic
+  data on measured downstream results or feature coverage, not n-gram
+  variety (post-training.md §14).
+- **MCQ evals need position-bias control**: score each item twice with the
+  options swapped and count only consistent wins ("robust accuracy", FAC
+  `[paper 2602.10388]`) — plain MCQ accuracy is inflated by position bias.
+  For imbalanced detection tasks (toxicity, safety filters), report
+  **AUPRC**, not accuracy — threshold-independent and imbalance-robust
+  (FAC evaluated on ToxicChat at 7.33% positive rate).
+- **Pin judges, simulators, and harness versions.** Agents-A1 replaced
+  retired proprietary judges/user-simulators with open models
+  (DeepSeek-V3.2) for reproducibility, and documented a benchmark-codebase
+  version change moving a baseline from 81.2 to 32.53 on τ²-bench `[paper
+  2606.30616]`. Leaderboard tables also often mix protocols (official
+  numbers where available, re-runs elsewhere) — say which is which.
