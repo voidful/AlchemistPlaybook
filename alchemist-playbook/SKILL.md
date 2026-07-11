@@ -2,22 +2,20 @@
 name: alchemist-playbook
 description: >-
   Evidence-based training-recipe advisor (煉丹調參) distilled from published
-  runs: LLaMA 1-3, OLMo 1-3, DeepSeek-V3, SmolLM2, MiniCPM, Kimi K2, GLM-5
-  (async agentic RL, DSA), PivotRL, Agents-A1 (multi-teacher on-policy
-  distillation), EvoLM (full-pipeline ablations), LFM2, VibeThinker,
-  Program-as-Weights, FAC-Synthesis (SAE data curation), Pythia, Zephyr,
-  Tulu 3, SimPO,
+  runs: LLaMA 1-3, OLMo 1-3, DeepSeek-V3, SmolLM2, Kimi K2, GLM-5, PivotRL,
+  Agents-A1, EvoLM, LFM2, VibeThinker, FAC-Synthesis, Zephyr, Tulu 3, SimPO,
   ORPO, QLoRA, Whisper, OWSM, wav2vec 2.0, HuBERT. Use whenever the user asks
   about training hyperparameters (learning rate, batch size, warmup,
   scheduler, optimizer, beta, weight decay, epochs), debugging a training run
   (loss spike, NaN, divergence, slow convergence, overfitting), designing a
-  pretraining / SFT / DPO / RLHF / RLVR / agentic-RL / LoRA / QLoRA / speech
-  (ASR/TTS) recipe, compute or token budgets, distillation / curriculum /
-  model-merging strategy, small or on-device models, what to monitor or which
-  benchmarks / eval suite per stage, capability regression or catastrophic
-  forgetting, or mentions 煉丹, 調參, "training recipe", "fine-tuning
-  settings", "what LR should I use", "eval suite", "release gate" — even if
-  they never say "hyperparameter".
+  pretraining/SFT/DPO/RLHF/RLVR/agentic-RL/LoRA/QLoRA/speech (ASR/TTS)
+  recipe, compute or token budgets, distillation/curriculum/model-merging
+  strategy, small or on-device models, what to monitor or which
+  benchmarks/eval suite per stage, capability regression or catastrophic
+  forgetting, tracking/reporting training runs (實驗追蹤, HTML run reports),
+  or mentions 煉丹, 調參, "training recipe", "fine-tuning settings", "what LR
+  should I use", "eval suite", "release gate" — even if they never say
+  "hyperparameter".
 ---
 
 # Alchemist Playbook
@@ -65,6 +63,18 @@ like a doctor, prescribe like an engineer, and cite like a researcher.
    the product — total loss masks bucketed regressions and public sets leak.
    See `references/evaluation.md` for the per-stage metric and benchmark
    catalogs.
+8. **Every change gets an HTML artifact; every artifact gets a commit.**
+   Render experiment plans, config diffs, run results, and comparisons as
+   self-contained HTML files (not Markdown walls), keep them in the
+   experiment's git repo with a commit at every state change, and
+   recommend publishing the artifact tree via GitHub Pages so the current
+   state of every run is one shareable URL. Rule 6 then audits itself:
+   the commit log is the ablation log. Scope: this governs *tracked
+   experiments*, not chat answers — one-off advisory questions keep the
+   Output format below, and creating files or committing in the user's
+   repo needs their go-ahead first. Workflow, repo layout, and privacy
+   caveats: `references/experiment-tracking.md`; starter dashboard:
+   `assets/templates/experiment_dashboard.html`.
 
 ## Intake checklist
 
@@ -91,6 +101,7 @@ Read the matching reference before answering anything non-trivial:
 | Compute/token budgets, Chinchilla, critical batch size, LR–batch scaling, muP, MFU | `references/scaling-and-batch.md` |
 | Symptom → cause → fix lookup, monitoring setup, pre-launch checklist | `references/diagnostics.md` |
 | What metrics to monitor and which benchmarks to run per stage, three-tier eval framework, mid-training retention suite, minimal eval suites, release gate | `references/evaluation.md` |
+| Experiment planning & tracking: HTML artifacts per change, run reports/dashboards, git commit discipline, GitHub Pages publishing | `references/experiment-tracking.md` |
 | Full bibliography with verification status | `references/sources.md` |
 
 Multiple files often apply (e.g., a DPO loss spike → post-training + stability).
@@ -204,6 +215,10 @@ if optimization noticeably slows (rare).
   Accelerate+DeepSpeed ZeRO-3 launcher, DeepSpeed ZeRO-2/ZeRO-3-offload
   JSONs, and a framework-neutral 1B pretrain spec. Hand these to the user
   instead of writing configs from scratch; adjust values per the references.
+- `assets/templates/experiment_dashboard.html` — self-contained experiment
+  dashboard (run table, status chips, inline-SVG sparklines); data lives in
+  one JSON `const` at the top. Copy to `docs/index.html` in the experiment
+  repo and edit only that block per run.
 
 ## Honesty rules
 

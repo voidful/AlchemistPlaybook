@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Experiment Dashboard</title>
+<script>
+// ─── EDIT THIS BLOCK ONLY ────────────────────────────────────────────────
+// One entry per run, newest first (add new runs at the top).
+// status: "running" | "kept" | "rolled-back" | "queued".
+// lowerIsBetter: true for loss-like metrics; false for accuracy / win rate.
+// curve: downsampled loss/metric series (≤ ~500 points). Links are relative
+// to this file (works from file:// and GitHub Pages alike).
+const EXPERIMENT = {
+  title: "7B pretrain — spike hunt",
+  planUrl: "plan.html",
+  metricName: "val loss",
+  lowerIsBetter: true,
+  runs: [
+    {
+      id: "07-11b",
+      change: "eps 1e-5 → 1e-8",
+      status: "running",
+      metric: null,
+      baselineMetric: 2.431,
+      window: "5k steps",
+      reportUrl: null,
+      configUrl: "configs/07-11b.yaml",
+      curve: [3.11, 2.93, 2.80, 2.69],
+    },
+    {
+      id: "07-11a",
+      change: "beta2 0.999 → 0.95",
+      status: "kept",
+      metric: 2.412,
+      baselineMetric: 2.431,
+      window: "5k steps, grad-norm < 2× median",
+      reportUrl: "runs/2026-07-11-beta2/report.html",
+      configUrl: "configs/07-11a.yaml",
+      curve: [3.10, 2.91, 2.78, 2.66, 2.58, 2.52, 2.47, 2.44, 2.42, 2.412],
+    },
+  ],
+};
+// ─────────────────────────────────────────────────────────────────────────
+</script>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1c2733; --muted: #64748b;
+    --line: #e2e8f0; --accent: #2563eb;
+    --kept: #15803d; --kept-bg: #dcfce7;
+    --rolled-back: #b91c1c; --rolled-back-bg: #fee2e2;
+    --running: #b45309; --running-bg: #fef3c7;
+    --queued: #475569; --queued-bg: #e2e8f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a; --card: #1e293b; --ink: #e2e8f0; --muted: #94a3b8;
+      --line: #334155; --accent: #60a5fa;
+      --kept-bg: #14532d; --kept: #bbf7d0;
+      --rolled-back-bg: #7f1d1d; --rolled-back: #fecaca;
+      --running-bg: #78350f; --running: #fde68a;
+      --queued-bg: #334155; --queued: #cbd5e1;
+    }
+  }
+  body { margin: 0; padding: 24px; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin-bottom: 20px; }
+  .sub a { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; background: var(--card);
+          border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+       color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  .chip { display: inline-block; padding: 2px 10px; border-radius: 999px;
+          font-size: 12px; font-weight: 600; }
+  .delta-good { color: var(--kept); font-weight: 600; }
+  .delta-bad { color: var(--rolled-back); font-weight: 600; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  svg.spark { display: block; }
+  .win { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<h1 id="title"></h1>
+<div class="sub">
+  <span id="run-count"></span> ·
+  <a id="plan-link" href="#">experiment plan</a> ·
+  metric: <span id="metric-name" class="mono"></span>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>Run</th><th>The one change</th><th>Status</th>
+      <th id="metric-col"></th><th>Curve</th><th>Links</th>
+    </tr>
+  </thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<script>
+function sparkline(points, w = 120, h = 32) {
+  if (!points || points.length < 2) return '<span class="muted">—</span>';
+  const min = Math.min(...points), max = Math.max(...points), span = max - min || 1;
+  const step = w / (points.length - 1);
+  const pts = points.map((v, i) =>
+    `${(i * step).toFixed(1)},${(h - 3 - (v - min) / span * (h - 6)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" width="${w}" height="${h}" role="img" aria-label="metric curve">
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+  </svg>`;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+document.getElementById('title').textContent = EXPERIMENT.title;
+document.getElementById('metric-name').textContent = EXPERIMENT.metricName;
+document.getElementById('metric-col').textContent = EXPERIMENT.metricName;
+document.getElementById('plan-link').href = EXPERIMENT.planUrl;
+document.getElementById('run-count').textContent = `${EXPERIMENT.runs.length} runs`;
+
+document.getElementById('rows').innerHTML = EXPERIMENT.runs.map(r => {
+  const delta = (r.metric != null && r.baselineMetric != null)
+    ? r.metric - r.baselineMetric : null;
+  const improved = EXPERIMENT.lowerIsBetter === false ? delta >= 0 : delta <= 0;
+  const deltaHtml = delta == null ? '<span class="muted">—</span>'
+    : `<span class="${improved ? 'delta-good' : 'delta-bad'}">
+         ${r.metric} (${delta > 0 ? '+' : ''}${delta.toFixed(3)})</span>`;
+  const links = [
+    r.reportUrl ? `<a href="${esc(r.reportUrl)}">report</a>` : null,
+    r.configUrl ? `<a href="${esc(r.configUrl)}">config</a>` : null,
+  ].filter(Boolean).join(' · ') || '<span class="muted">—</span>';
+  const st = ['running', 'kept', 'rolled-back', 'queued'].includes(r.status)
+    ? r.status : 'queued';
+  return `<tr>
+    <td class="mono">${esc(r.id)}</td>
+    <td>${esc(r.change)}<div class="win">window: ${esc(r.window || '—')}</div></td>
+    <td><span class="chip" style="color:var(--${st});background:var(--${st}-bg)">${esc(r.status)}</span></td>
+    <td>${deltaHtml}</td>
+    <td>${sparkline(r.curve)}</td>
+    <td>${links}</td>
+  </tr>`;
+}).join('');
+</script>
+</body>
+</html>

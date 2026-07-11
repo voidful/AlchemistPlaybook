@@ -109,6 +109,17 @@ stated in that file are properties of the named benchmark:
 | AlpacaEval 2 / Arena-Hard / MT-Bench | arXiv 2404.04475 / lmarena Arena-Hard / arXiv 2306.05685 | LLM-judge dialogue win-rate / Elo (relative, judge-dependent) |
 | Other named sets | C-Eval, CMMLU, AGIEval, BBH, GSM8K, MATH, HellaSwag, ARC, Winogrande, TruthfulQA, LongBench, FLORES-200, XNLI, WMDP, JailbreakBench, WebArena, GAIA, BFCL | standard benchmarks; cite by their canonical paper when precision matters |
 
+## Workflow & tracking
+
+| Source | ID / link | Used for |
+| --- | --- | --- |
+| "Using Claude Code: the unreasonable effectiveness of HTML" (Thariq Shihipar, Anthropic) | claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html (2026-05) | `experiment-tracking.md`: HTML-over-Markdown artifact discipline — self-contained HTML for plans/reports, side-by-side comparison grids, artifact webs read by later sessions/verification agents. `[reported]` workflow practice, **not training evidence** — never cite it for a hyperparameter. |
+
+The git-commit-per-change and GitHub Pages mechanics in that file are
+standard git/GitHub product behavior; the Pages-is-public-even-for-private-
+repos caveat is from GitHub's own documentation. The commit-point and
+artifact-set conventions are `[heuristic]` extensions of principle 6.
+
 ## Reviewed and excluded (no training evidence)
 
 `itayinbarr/little-coder` and `Doorman11991/smallcode` (community repos,
