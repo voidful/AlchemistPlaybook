@@ -6,16 +6,121 @@
 <title>Experiment Dashboard</title>
 <script>
 // ─── EDIT THIS BLOCK ONLY ────────────────────────────────────────────────
-// One entry per run, newest first (add new runs at the top).
-// status: "running" | "kept" | "rolled-back" | "queued".
+// Implements the report-detail standard of references/experiment-tracking.md
+// §4. Sections with an empty/missing array are hidden automatically.
+// runs: one entry per run, newest first (add new runs at the top).
+//   status: "running" | "kept" | "rolled-back" | "queued".
+//   notes: optional per-rung provenance — job ids, run dir, review fixes.
 // lowerIsBetter: true for loss-like metrics; false for accuracy / win rate.
-// curve: downsampled loss/metric series (≤ ~500 points). Links are relative
-// to this file (works from file:// and GitHub Pages alike).
+// charts[].series[].points: numbers (x = index) or [x, y] pairs, ≤ ~700 pts;
+//   use ONE form per chart — mixing misaligns the index-based series.
+//   Every chart MUST have a caption: what it measures, why it matters,
+//   expected shape, bound/baseline anchors.
+// evalTable cells: pass strings (e.g. "2.470") to pin column precision.
+// samples.kind: "text" | "audio" | "image" — gt/hyp are text for "text",
+//   file paths (e.g. "results/samples/80000/probe-03_gt.wav") otherwise.
+//   Fixed probe set, SAME items at every checkpoint; never hand-picked.
+//   For agentic-RL trajectories add a <details> renderer (§4.8) — not built in.
+// smoothing: default EMA factor for curves; raw ghost always shown (§4.9).
+// charts[].xLabel: state the x unit — "step" or "tokens" (§4.10).
+// runs[].repro: git SHA + seed + env + data version + parent ckpt (§4.11).
+// sweep: knob-vs-metric scatter once ≥3 runs vary one knob (§4.12).
+// generatedAt (ISO-8601, e.g. "2026-07-11T10:03:00Z") + staleAfterHours:
+//   stale-banner self-check (§4.13).
+// goals (§4.14): one card per pre-registered target. history = recent eval
+//   [step, value] points (the trend ETA is a linear fit over the last 4);
+//   start = value at step 0 for the progress bar; budgetStep marks at-risk.
+// stepsPerMin: converts trend ETA into wall-clock hours (optional).
+// Links are relative to this file (works from file:// and Pages alike).
 const EXPERIMENT = {
   title: "7B pretrain — spike hunt",
+  subtitle: "E1 — β₂/ε stability ladder · 4M tokens/step · ← plan.html",
   planUrl: "plan.html",
   metricName: "val loss",
   lowerIsBetter: true,
+  smoothing: 0.6,
+  generatedAt: "2026-07-11T10:03:00Z",
+  staleAfterHours: 24,
+  stepsPerMin: 52.3,
+
+  // §4.14 goal progress — the release gate made visible, first thing read
+  goals: [
+    {
+      name: "val loss ≤ 2.35",
+      target: 2.35,
+      start: 3.40,
+      history: [[20000, 2.681], [40000, 2.549], [60000, 2.470], [80000, 2.412]],
+      budgetStep: 200000,
+      note: "gate for promoting this recipe to the E5 anneal",
+    },
+    {
+      name: "HellaSwag ≥ 0.66",
+      target: 0.66,
+      start: 0.25,
+      lowerIsBetter: false,
+      history: [[20000, 0.412], [40000, 0.451], [60000, 0.478], [80000, 0.492]],
+      budgetStep: 200000,
+      note: "release-gate probe (evaluation.md tier 3)",
+    },
+  ],
+
+  // §4.1 status strip — each tile: value + its bound/context in `sub`
+  stats: [
+    { label: "progress", value: "82k / 200k steps", sub: "41% of budget" },
+    { label: "train loss (latest)", value: "2.210", sub: "recon 2.040" },
+    { label: "val loss", value: "2.412", sub: "@ step 80k" },
+    { label: "grad-norm", value: "0.84", sub: "running median 0.79; clip at 1.0" },
+    { label: "speed / ETA", value: "52.3 step/min", sub: "~37.6 training-hours left" },
+  ],
+
+  // §4.2 captioned curves
+  charts: [
+    {
+      title: "Training loss",
+      caption: "total = LM loss + z-loss; smooth power-law decay expected — " +
+               "any step-shaped jump is a spike, cross-check grad-norm below.",
+      series: [
+        { name: "total", points: [[0,3.4],[10000,2.9],[20000,2.72],[30000,2.6],[40000,2.52],[50000,2.44],[60000,2.36],[70000,2.28],[80000,2.21]] },
+        { name: "z-loss ×100", points: [[0,1.9],[10000,1.2],[20000,1.05],[30000,0.9],[40000,0.86],[50000,0.83],[60000,0.8],[70000,0.79],[80000,0.78]] },
+      ],
+      xLabel: "step",
+    },
+    {
+      title: "Grad-norm",
+      caption: "should stay < 2× running median (diagnostics.md); the 62k " +
+               "excursion is the β₂=0.999 spike this ladder is hunting.",
+      series: [
+        { name: "grad-norm", points: [[0,1.6],[10000,0.9],[20000,0.85],[30000,0.8],[40000,0.82],[50000,0.79],[62000,2.9],[70000,0.83],[80000,0.84]] },
+      ],
+      xLabel: "step",
+    },
+  ],
+
+  // §4.12 sweep view — knob value vs headline metric, chosen point marked
+  sweep: {
+    knob: "peak LR",
+    metric: "val loss @ 20k (probe runs)",
+    xLog: true,
+    note: "3-point LR probe run before this ladder; 3e-4 chosen (SKILL.md 7–13B row)",
+    points: [
+      { x: 1e-4, y: 2.93, id: "lr-a" },
+      { x: 3e-4, y: 2.68, id: "lr-b", chosen: true },
+      { x: 6e-4, y: 2.71, id: "lr-c" },
+    ],
+  },
+
+  // §4.3 eval table — the numbers behind the curves, no hover needed
+  evalTable: {
+    columns: ["step", "val loss", "HellaSwag acc", "grad-norm p95"],
+    rows: [
+      [20000, "2.681", "0.412", "0.97"],
+      [40000, "2.549", "0.451", "0.94"],
+      [60000, "2.470", "0.478", "2.90"],
+      [80000, "2.412", "0.492", "0.91"],
+    ],
+  },
+
+  // §4.4 experiment ladder / runs — newest first; gate = pre-registered
   runs: [
     {
       id: "07-11b",
@@ -24,6 +129,7 @@ const EXPERIMENT = {
       metric: null,
       baselineMetric: 2.431,
       window: "5k steps",
+      gate: "no spike AND val loss ≤ baseline at 90k",
       reportUrl: null,
       configUrl: "configs/07-11b.yaml",
       curve: [3.11, 2.93, 2.80, 2.69],
@@ -35,18 +141,65 @@ const EXPERIMENT = {
       metric: 2.412,
       baselineMetric: 2.431,
       window: "5k steps, grad-norm < 2× median",
+      gate: "grad-norm p95 < 1.5 for 5k steps",
+      notes: "jobs 30093216→30110413 · runs/2026-07-11-beta2",
+      repro: "sha 7986b27 · seed 42 · torch 2.9/cu12.6 · data-mix v3 · parent: base-60k",
       reportUrl: "runs/2026-07-11-beta2/report.html",
       configUrl: "configs/07-11a.yaml",
       curve: [3.10, 2.91, 2.78, 2.66, 2.58, 2.52, 2.47, 2.44, 2.42, 2.412],
     },
   ],
+
+  // §4.5 decision ledger — dated, honest ("NOT gated" when it isn't)
+  ledger: [
+    {
+      date: "2026-07-11",
+      exp: "07-11a",
+      significant: false,
+      decision: "β₂=0.95 kept: grad-norm p95 0.91 vs 2.90 before, val loss " +
+                "2.412 vs 2.431. NOT a CI-gated comparison (single seed); " +
+                "next: eps ladder (07-11b), formal paired eval at 100k.",
+    },
+  ],
+
+  // §4.8 inference vs ground truth — pre-registered probe set (plan.html)
+  samples: {
+    kind: "text",
+    note: "probe set of 8 pre-registered in plan.html (incl. 3 known-hard); checkpoint @ step 80k",
+    items: [
+      {
+        id: "probe-03 (hard: rare-word)",
+        gt: "the quokka photographed on Rottnest Island went viral",
+        hyp: "the quokka photographed on rotten nest island went viral",
+        note: "rare proper noun still splits — same failure as step 60k",
+      },
+      {
+        id: "probe-07",
+        gt: "revenue grew eight percent quarter over quarter",
+        hyp: "revenue grew eight percent quarter over quarter",
+        note: "fixed since step 60k (was 'ate percent')",
+      },
+    ],
+  },
+
+  // §4.6 infra chain — stalled/dead job chains visible at a glance
+  jobs: [
+    { id: "30110413", from: 69001, to: 82000, updated: "2026-07-11 10:03 UTC" },
+    { id: "30093216", from: 57501, to: 69100, updated: "2026-07-11 05:59 UTC" },
+  ],
+
+  // §4.7 provenance footer
+  footer: "Generated 2026-07-11 10:03 UTC · queue: 30110413 RUNNING · " +
+          "curves are 25-step logs thinned to ≤700 points · batch stats are " +
+          "single-batch; corpus numbers come from the gated evals (ledger) · " +
+          "config: 7B dense, AdamW, 4M-token batch, bf16, FineWeb, 64×H100.",
 };
 // ─────────────────────────────────────────────────────────────────────────
 </script>
 <style>
   :root {
     --bg: #f6f7f9; --card: #ffffff; --ink: #1c2733; --muted: #64748b;
-    --line: #e2e8f0; --accent: #2563eb;
+    --line: #e2e8f0; --accent: #2563eb; --accent2: #0d9488;
     --kept: #15803d; --kept-bg: #dcfce7;
     --rolled-back: #b91c1c; --rolled-back-bg: #fee2e2;
     --running: #b45309; --running-bg: #fef3c7;
@@ -55,7 +208,7 @@ const EXPERIMENT = {
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #0f172a; --card: #1e293b; --ink: #e2e8f0; --muted: #94a3b8;
-      --line: #334155; --accent: #60a5fa;
+      --line: #334155; --accent: #60a5fa; --accent2: #2dd4bf;
       --kept-bg: #14532d; --kept: #bbf7d0;
       --rolled-back-bg: #7f1d1d; --rolled-back: #fecaca;
       --running-bg: #78350f; --running: #fde68a;
@@ -65,11 +218,31 @@ const EXPERIMENT = {
   body { margin: 0; padding: 24px; background: var(--bg); color: var(--ink);
          font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
   h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 28px 0 10px; }
   .sub { color: var(--muted); margin-bottom: 20px; }
-  .sub a { color: var(--accent); }
+  .sub a, a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+           gap: 12px; }
+  .tile { background: var(--card); border: 1px solid var(--line);
+          border-radius: 10px; padding: 12px 14px; }
+  .tile .l { font-size: 12px; color: var(--muted); }
+  .tile .v { font-size: 20px; font-weight: 700; margin: 2px 0; }
+  .tile .s { font-size: 12px; color: var(--muted); }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 12px; }
+  .chart-card { background: var(--card); border: 1px solid var(--line);
+                border-radius: 10px; padding: 14px; }
+  .chart-card h3 { margin: 0 0 4px; font-size: 14px; }
+  .chart-card .cap { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .legend { font-size: 12px; margin-bottom: 4px; }
+  .legend span { margin-right: 12px; }
+  .legend i { display: inline-block; width: 14px; height: 3px;
+              vertical-align: middle; margin-right: 4px; }
   table { width: 100%; border-collapse: collapse; background: var(--card);
           border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line);
+           font-size: 14px; }
   th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
        color: var(--muted); }
   tr:last-child td { border-bottom: none; }
@@ -79,74 +252,372 @@ const EXPERIMENT = {
   .delta-bad { color: var(--rolled-back); font-weight: 600; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
   .muted { color: var(--muted); }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  svg.spark { display: block; }
   .win { font-size: 12px; color: var(--muted); }
+  svg.spark, svg.line { display: block; }
+  .footer { margin-top: 24px; font-size: 12px; color: var(--muted);
+            border-top: 1px solid var(--line); padding-top: 10px; }
+  .banner { background: var(--running-bg); color: var(--running);
+            border: 1px solid var(--line); border-radius: 10px;
+            padding: 10px 14px; margin-bottom: 16px; font-size: 13px; }
+  .goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+           gap: 12px; }
+  .goal { background: var(--card); border: 1px solid var(--line);
+          border-radius: 10px; padding: 12px 14px; }
+  .goal .g-head { display: flex; justify-content: space-between;
+                  align-items: baseline; gap: 8px; }
+  .goal .g-name { font-weight: 700; font-size: 14px; }
+  .goal .g-cur { font-size: 18px; font-weight: 700; margin: 4px 0 6px; }
+  .goal .g-cur .muted { font-size: 12px; font-weight: 400; }
+  .bar { height: 8px; background: var(--line); border-radius: 999px;
+         overflow: hidden; margin: 4px 0 6px; }
+  .bar .fill { height: 100%; border-radius: 999px; }
+  section[hidden] { display: none; }
 </style>
 </head>
 <body>
 <h1 id="title"></h1>
-<div class="sub">
-  <span id="run-count"></span> ·
-  <a id="plan-link" href="#">experiment plan</a> ·
-  metric: <span id="metric-name" class="mono"></span>
-</div>
-<table>
-  <thead>
-    <tr>
-      <th>Run</th><th>The one change</th><th>Status</th>
-      <th id="metric-col"></th><th>Curve</th><th>Links</th>
-    </tr>
-  </thead>
-  <tbody id="rows"></tbody>
-</table>
+<div class="sub"><span id="subtitle"></span></div>
+<div id="stale-banner" class="banner" hidden></div>
+
+<section id="sec-stats"><div class="tiles" id="tiles"></div></section>
+
+<section id="sec-goals"><h2>Goals — how far, how long
+  <span class="muted" style="font-weight:400;font-size:13px">(trend ETA: linear over last 4 evals — assumes the trend holds; deceleration is the norm near convergence)</span></h2>
+  <div class="goals" id="goals"></div>
+</section>
+
+<section id="sec-charts">
+  <h2>Curves <span class="muted" style="font-weight:400;font-size:13px">— smoothing
+    <input type="range" id="smooth" min="0" max="0.95" step="0.05" value="0.6" style="vertical-align:middle">
+    <span id="smooth-v" class="mono"></span> (raw shown as ghost)</span></h2>
+  <div class="charts" id="charts"></div>
+</section>
+
+<section id="sec-eval"><h2>Eval table</h2><div id="eval"></div></section>
+
+<section id="sec-sweep"><h2 id="sweep-title"></h2><div class="chart-card" id="sweep" style="max-width:560px"></div></section>
+
+<section id="sec-runs">
+  <h2>Runs <span class="muted" style="font-weight:400">(newest first · <a id="plan-link" href="#">plan</a> · metric: <span id="metric-name" class="mono"></span>)</span></h2>
+  <table>
+    <thead><tr><th>Run</th><th>The one change</th><th>Status</th>
+      <th id="metric-col"></th><th>Curve</th><th>Gate</th><th>Links</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</section>
+
+<section id="sec-ledger"><h2>Decision ledger</h2><div id="ledger"></div></section>
+
+<section id="sec-samples">
+  <h2>Samples: model vs. ground truth <span class="muted" id="samples-note" style="font-weight:400;font-size:13px"></span></h2>
+  <div id="samples"></div>
+</section>
+
+<section id="sec-jobs"><h2>Job chain</h2><div id="jobs"></div></section>
+
+<div class="footer" id="footer"></div>
 
 <script>
-function sparkline(points, w = 120, h = 32) {
-  if (!points || points.length < 2) return '<span class="muted">—</span>';
-  const min = Math.min(...points), max = Math.max(...points), span = max - min || 1;
-  const step = w / (points.length - 1);
-  const pts = points.map((v, i) =>
-    `${(i * step).toFixed(1)},${(h - 3 - (v - min) / span * (h - 6)).toFixed(1)}`).join(' ');
-  return `<svg class="spark" width="${w}" height="${h}" role="img" aria-label="metric curve">
-    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
-  </svg>`;
-}
+const COLORS = ['var(--accent)', 'var(--accent2)', 'var(--running)', 'var(--rolled-back)'];
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
-document.getElementById('title').textContent = EXPERIMENT.title;
-document.getElementById('metric-name').textContent = EXPERIMENT.metricName;
-document.getElementById('metric-col').textContent = EXPERIMENT.metricName;
-document.getElementById('plan-link').href = EXPERIMENT.planUrl;
-document.getElementById('run-count').textContent = `${EXPERIMENT.runs.length} runs`;
+function toXY(points) {
+  return points.map((p, i) => Array.isArray(p) ? p : [i, p]);
+}
 
-document.getElementById('rows').innerHTML = EXPERIMENT.runs.map(r => {
-  const delta = (r.metric != null && r.baselineMetric != null)
-    ? r.metric - r.baselineMetric : null;
-  const improved = EXPERIMENT.lowerIsBetter === false ? delta >= 0 : delta <= 0;
-  const deltaHtml = delta == null ? '<span class="muted">—</span>'
-    : `<span class="${improved ? 'delta-good' : 'delta-bad'}">
-         ${r.metric} (${delta > 0 ? '+' : ''}${delta.toFixed(3)})</span>`;
-  const links = [
-    r.reportUrl ? `<a href="${esc(r.reportUrl)}">report</a>` : null,
-    r.configUrl ? `<a href="${esc(r.configUrl)}">config</a>` : null,
-  ].filter(Boolean).join(' · ') || '<span class="muted">—</span>';
-  const st = ['running', 'kept', 'rolled-back', 'queued'].includes(r.status)
-    ? r.status : 'queued';
-  return `<tr>
-    <td class="mono">${esc(r.id)}</td>
-    <td>${esc(r.change)}<div class="win">window: ${esc(r.window || '—')}</div></td>
-    <td><span class="chip" style="color:var(--${st});background:var(--${st}-bg)">${esc(r.status)}</span></td>
-    <td>${deltaHtml}</td>
-    <td>${sparkline(r.curve)}</td>
-    <td>${links}</td>
-  </tr>`;
-}).join('');
+function fmtMag(v) {
+  const a = Math.abs(v);
+  if (a >= 1e12) return +(v / 1e12).toFixed(2) + 'T';
+  if (a >= 1e9) return +(v / 1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return +(v / 1e6).toFixed(2) + 'M';
+  return +(v / 1e3).toFixed(2) + 'k';
+}
+
+function fmt(v, spacing) {
+  if (Math.abs(v) >= 1000) return fmtMag(v);
+  const dec = spacing > 0
+    ? Math.max(0, Math.min(6, 2 - Math.floor(Math.log10(spacing)))) : 3;
+  return +v.toFixed(dec);
+}
+
+function fmtVal(v) {
+  if (Math.abs(v) >= 1000) return fmtMag(v);
+  if (v !== 0 && Math.abs(v) < 0.001) return v.toExponential(1);
+  return +v.toPrecision(3);
+}
+
+function ema(xy, a) {
+  let s;
+  return xy.map((p, i) => { s = i ? a * s + (1 - a) * p[1] : p[1]; return [p[0], s]; });
+}
+
+function trendSlope(hist, k = 4) {
+  const pts = hist.slice(-k);
+  if (pts.length < 2) return null;
+  const dx = pts[pts.length - 1][0] - pts[0][0];
+  return dx ? (pts[pts.length - 1][1] - pts[0][1]) / dx : null;
+}
+
+function sparkline(points, w = 110, h = 30) {
+  if (!points || points.length < 2) return '<span class="muted">—</span>';
+  const xy = toXY(points);
+  const ys = xy.map(p => p[1]);
+  const min = Math.min(...ys), max = Math.max(...ys), span = max - min || 1;
+  const step = w / (xy.length - 1);
+  const pts = xy.map((p, i) =>
+    `${(i * step).toFixed(1)},${(h - 3 - (p[1] - min) / span * (h - 6)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" width="${w}" height="${h}" role="img" aria-label="metric curve">
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5"/></svg>`;
+}
+
+function lineChart(series, opts = {}, w = 460, h = 180) {
+  const { alpha = 0, logY = false } = opts;
+  const padL = 44, padR = 8, padT = 6, padB = 18;
+  const tf = pts => pts.map(p => [p[0], logY ? Math.log10(p[1]) : p[1]]);
+  const prep = series.map(s => {
+    const raw = toXY(s.points);
+    return { raw: tf(raw), sm: tf(alpha > 0 ? ema(raw, alpha) : raw) };
+  });
+  const all = prep.flatMap(p => p.raw);
+  if (!all.length) return '';
+  const xs = all.map(p => p[0]), ys = all.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  if (y0 === y1) { const pad = Math.abs(y0) * 0.05 || 1; y0 -= pad; y1 += pad; }
+  const xSpan = x1 - x0 || 1, ySpan = y1 - y0;
+  const X = x => padL + (x - x0) / xSpan * (w - padL - padR);
+  const Y = y => padT + (1 - (y - y0) / ySpan) * (h - padT - padB);
+  const yLabel = g => logY ? fmtVal(Math.pow(10, g)) : fmt(g, ySpan / 2);
+  const grid = [y0, (y0 + y1) / 2, y1].map(g =>
+    `<line x1="${padL}" y1="${Y(g)}" x2="${w - padR}" y2="${Y(g)}" stroke="var(--line)" stroke-width="1"/>
+     <text x="${padL - 6}" y="${Y(g) + 4}" font-size="10" fill="var(--muted)" text-anchor="end">${yLabel(g)}</text>`).join('');
+  const xTicks = [...new Set([x0, (x0 + x1) / 2, x1])].map(t =>
+    `<text x="${X(t)}" y="${h - 4}" font-size="10" fill="var(--muted)" text-anchor="middle">${fmt(t, xSpan / 2)}</text>`).join('');
+  const lines = prep.map((p, i) => {
+    const color = COLORS[i % COLORS.length];
+    if (p.raw.length === 1) return `<circle cx="${X(p.raw[0][0]).toFixed(1)}" cy="${Y(p.raw[0][1]).toFixed(1)}" r="3" fill="${color}"/>`;
+    const poly = pts => pts.map(q => `${X(q[0]).toFixed(1)},${Y(q[1]).toFixed(1)}`).join(' ');
+    const ghost = alpha > 0
+      ? `<polyline points="${poly(p.raw)}" fill="none" stroke="${color}" stroke-width="1" opacity="0.25"/>` : '';
+    return ghost + `<polyline points="${poly(p.sm)}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+  }).join('');
+  return `<svg class="line" viewBox="0 0 ${w} ${h}" width="100%" role="img">${grid}${xTicks}${lines}</svg>`;
+}
+
+function scatterChart(sw, w = 460, h = 200) {
+  const padL = 44, padR = 12, padT = 14, padB = 18;
+  const xLog = !!sw.xLog && sw.points.every(p => p.x > 0);
+  const pts = sw.points.map(p => ({ ...p, tx: xLog ? Math.log10(p.x) : p.x }));
+  const xs = pts.map(p => p.tx), ys = pts.map(p => p.y);
+  let x0 = Math.min(...xs), x1 = Math.max(...xs);
+  if (x0 === x1) { const p = Math.abs(x0) * 0.05 || 1; x0 -= p; x1 += p; }
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  if (y0 === y1) { const p = Math.abs(y0) * 0.05 || 1; y0 -= p; y1 += p; }
+  const xSpan = x1 - x0, ySpan = y1 - y0;
+  const X = x => padL + (x - x0) / xSpan * (w - padL - padR);
+  const Y = y => padT + (1 - (y - y0) / ySpan) * (h - padT - padB);
+  const xv = t => xLog ? fmtVal(Math.pow(10, t)) : fmt(t, xSpan / 2);
+  const grid = [y0, (y0 + y1) / 2, y1].map(g =>
+    `<line x1="${padL}" y1="${Y(g)}" x2="${w - padR}" y2="${Y(g)}" stroke="var(--line)" stroke-width="1"/>
+     <text x="${padL - 6}" y="${Y(g) + 4}" font-size="10" fill="var(--muted)" text-anchor="end">${fmt(g, ySpan / 2)}</text>`).join('');
+  const xTicks = [...new Set([x0, (x0 + x1) / 2, x1])].map(t =>
+    `<text x="${X(t)}" y="${h - 4}" font-size="10" fill="var(--muted)" text-anchor="middle">${xv(t)}</text>`).join('');
+  const dots = pts.map(p =>
+    `<circle cx="${X(p.tx).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="${p.chosen ? 5 : 4}"
+       fill="${p.chosen ? 'var(--accent)' : 'var(--accent2)'}"${p.chosen ? ' stroke="var(--ink)" stroke-width="1.5"' : ''}/>
+     <text x="${X(p.tx).toFixed(1)}" y="${(Y(p.y) - 9).toFixed(1)}" font-size="10" fill="var(--muted)" text-anchor="middle">${esc(p.id || '')}${p.chosen ? ' ✓' : ''}</text>`).join('');
+  return `<svg class="line" viewBox="0 0 ${w} ${h}" width="100%" role="img">${grid}${xTicks}${dots}</svg>`;
+}
+
+function renderTable(columns, rows) {
+  return `<table><thead><tr>${columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${r.map(v =>
+      `<td>${typeof v === 'number'
+        ? (Number.isInteger(v) ? v.toLocaleString('en-US') : String(v))
+        : esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+function show(secId, hasContent) {
+  document.getElementById(secId).hidden = !hasContent;
+  return hasContent;
+}
+
+const E = EXPERIMENT;
+document.getElementById('title').textContent = E.title;
+document.getElementById('subtitle').textContent = E.subtitle || '';
+document.getElementById('metric-name').textContent = E.metricName;
+document.getElementById('metric-col').textContent = E.metricName;
+document.getElementById('plan-link').href = E.planUrl || '#';
+const footerEl = document.getElementById('footer');
+footerEl.textContent = E.footer || '';
+footerEl.hidden = !E.footer;
+
+if (E.generatedAt) {
+  const t = new Date(E.generatedAt).getTime();
+  const limit = E.staleAfterHours ?? 24;
+  const b = document.getElementById('stale-banner');
+  if (!isFinite(t)) {
+    b.textContent = `⚠ generatedAt "${E.generatedAt}" is unparseable — use ISO-8601 ` +
+      `(e.g. 2026-07-11T10:03:00Z); the staleness self-check is disabled until fixed.`;
+    b.hidden = false;
+  } else if ((Date.now() - t) / 3600000 > limit) {
+    const ageH = (Date.now() - t) / 3600000;
+    b.textContent = `⚠ Generated ${Math.round(ageH)}h ago (stale after ${limit}h) — ` +
+      `the regeneration loop may be dead; treat these numbers as stale.`;
+    b.hidden = false;
+  }
+}
+
+if (show('sec-stats', E.stats && E.stats.length)) {
+  document.getElementById('tiles').innerHTML = E.stats.map(t => `
+    <div class="tile"><div class="l">${esc(t.label)}</div>
+      <div class="v">${esc(t.value)}</div><div class="s">${esc(t.sub || '')}</div></div>`).join('');
+}
+
+if (show('sec-goals', E.goals && E.goals.length)) {
+  document.getElementById('goals').innerHTML = E.goals.map(g => {
+    const hist = toXY(g.history || []);
+    if (!hist.length || g.target == null) return '';
+    const lib = g.lowerIsBetter ?? E.lowerIsBetter ?? true;
+    const [curStep, cur] = hist[hist.length - 1];
+    const achieved = lib ? cur <= g.target : cur >= g.target;
+    const gap = lib ? cur - g.target : g.target - cur;   // >0 = remaining
+    const denom = g.start != null ? g.target - g.start : null;
+    let pct = achieved ? 100 : denom
+      ? Math.round(Math.min(1, Math.max(0, (cur - g.start) / denom)) * 100) : null;
+    const slope = trendSlope(hist);
+    let chip = 'kept', chipTxt = 'on track', eta = '';
+    if (achieved) { chipTxt = 'achieved ✓'; eta = 'target met'; }
+    else if (slope == null) { chip = 'queued'; chipTxt = 'no trend'; eta = 'need ≥2 evals for an ETA'; }
+    else if ((lib ? slope >= 0 : slope <= 0) || Math.abs(slope) < 1e-15) {
+      chip = 'rolled-back'; chipTxt = 'off track';
+      eta = 'trend flat or moving away — no honest ETA exists';
+    } else {
+      const stepsLeft = Math.abs(gap / slope);
+      const etaStep = curStep + stepsLeft;
+      const hrs = E.stepsPerMin ? stepsLeft / E.stepsPerMin / 60 : null;
+      eta = `at current trend: ~step ${fmt(etaStep)} (${fmt(stepsLeft)} steps` +
+            `${hrs != null ? `, ~${Math.round(hrs)}h` : ''} to go)`;
+      if (g.budgetStep && etaStep > g.budgetStep) {
+        chip = 'running'; chipTxt = 'at risk';
+        eta += ` — beyond the ${fmt(g.budgetStep)}-step budget`;
+      }
+    }
+    return `<div class="goal">
+      <div class="g-head"><span class="g-name">${esc(g.name)}</span>
+        <span class="chip" style="color:var(--${chip});background:var(--${chip}-bg)">${chipTxt}</span></div>
+      <div class="g-cur">${cur} <span class="muted">@ ${fmt(curStep)} → target ${g.target}` +
+        `${achieved ? '' : ` · gap ${+gap.toPrecision(3)}`}</span></div>
+      ${pct != null ? `<div class="bar"><div class="fill" style="width:${pct}%;background:var(--${chip})"></div></div>` : ''}
+      <div class="win">${eta}</div>
+      ${g.note ? `<div class="win">${esc(g.note)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+const chartLog = (E.charts || []).map(c => !!c.logY);
+function renderCharts() {
+  const alpha = +document.getElementById('smooth').value;
+  document.getElementById('smooth-v').textContent = alpha.toFixed(2);
+  document.getElementById('charts').innerHTML = E.charts.map((c, ci) => {
+    const canLog = c.series.every(s => toXY(s.points).every(p => p[1] > 0));
+    return `
+    <div class="chart-card"><h3>${esc(c.title)}</h3>
+      <div class="cap">${esc(c.caption || '')}</div>
+      <div class="legend">${c.series.map((s, i) =>
+        `<span><i style="background:${COLORS[i % COLORS.length]}"></i>${esc(s.name)}</span>`).join('')}
+        <label style="float:right"${canLog ? '' : ' title="disabled: non-positive values"'}>
+          <input type="checkbox" data-ci="${ci}"${chartLog[ci] && canLog ? ' checked' : ''}${canLog ? '' : ' disabled'}> log y</label></div>
+      ${lineChart(c.series, { alpha, logY: chartLog[ci] && canLog })}
+      <div class="win" style="text-align:center">${esc(c.xLabel || 'step')}</div></div>`;
+  }).join('');
+}
+if (show('sec-charts', E.charts && E.charts.length)) {
+  const slider = document.getElementById('smooth');
+  slider.value = E.smoothing ?? 0.6;
+  renderCharts();
+  slider.addEventListener('input', renderCharts);
+  document.getElementById('charts').addEventListener('change', e => {
+    if (e.target.dataset && e.target.dataset.ci != null) {
+      chartLog[+e.target.dataset.ci] = e.target.checked;
+      renderCharts();
+    }
+  });
+}
+
+if (show('sec-sweep', E.sweep && E.sweep.points && E.sweep.points.length)) {
+  const xLogEff = !!E.sweep.xLog && E.sweep.points.every(p => p.x > 0);
+  document.getElementById('sweep-title').textContent =
+    `Sweep: ${E.sweep.knob} vs ${E.sweep.metric}`;
+  document.getElementById('sweep').innerHTML =
+    `<div class="cap">${esc(E.sweep.note || '')}</div>` + scatterChart(E.sweep) +
+    `<div class="win" style="text-align:center">${esc(E.sweep.knob)}${xLogEff ? ' (log)' : ''}</div>`;
+}
+
+if (show('sec-eval', E.evalTable && E.evalTable.rows && E.evalTable.rows.length)) {
+  document.getElementById('eval').innerHTML = renderTable(E.evalTable.columns, E.evalTable.rows);
+}
+
+if (show('sec-runs', E.runs && E.runs.length)) {
+  document.getElementById('rows').innerHTML = E.runs.map(r => {
+    const delta = (r.metric != null && r.baselineMetric != null)
+      ? r.metric - r.baselineMetric : null;
+    const improved = E.lowerIsBetter === false ? delta >= 0 : delta <= 0;
+    const deltaHtml = delta == null ? '<span class="muted">—</span>'
+      : `<span class="${improved ? 'delta-good' : 'delta-bad'}">
+           ${r.metric} (${delta > 0 ? '+' : ''}${delta.toFixed(3)})</span>`;
+    const links = [
+      r.reportUrl ? `<a href="${esc(r.reportUrl)}">report</a>` : null,
+      r.configUrl ? `<a href="${esc(r.configUrl)}">config</a>` : null,
+    ].filter(Boolean).join(' · ') || '<span class="muted">—</span>';
+    const st = ['running', 'kept', 'rolled-back', 'queued'].includes(r.status)
+      ? r.status : 'queued';
+    return `<tr>
+      <td class="mono">${esc(r.id)}</td>
+      <td>${esc(r.change)}<div class="win">window: ${esc(r.window || '—')}</div>${r.notes ? `<div class="win">${esc(r.notes)}</div>` : ''}${r.repro ? `<div class="win mono">${esc(r.repro)}</div>` : ''}</td>
+      <td><span class="chip" style="color:var(--${st});background:var(--${st}-bg)">${esc(r.status)}</span></td>
+      <td>${deltaHtml}</td>
+      <td>${sparkline(r.curve)}</td>
+      <td class="win">${esc(r.gate || '—')}</td>
+      <td>${links}</td>
+    </tr>`;
+  }).join('');
+}
+
+if (show('sec-ledger', E.ledger && E.ledger.length)) {
+  document.getElementById('ledger').innerHTML = renderTable(
+    ['date', 'experiment', 'significant', 'decision'],
+    E.ledger.map(l => [l.date, l.exp, l.significant ? 'yes' : 'no', l.decision]));
+}
+
+if (show('sec-samples', E.samples && E.samples.items && E.samples.items.length)) {
+  const kind = E.samples.kind || 'text';
+  const cell = v => {
+    if (v == null || v === '') return '<span class="muted">—</span>';
+    if (kind === 'audio') return `<audio controls preload="none" src="${esc(v)}" style="width:220px"></audio>`;
+    if (kind === 'image') return `<img src="${esc(v)}" alt="" style="max-width:220px;border-radius:6px">`;
+    return `<div class="mono" style="white-space:pre-wrap">${esc(v)}</div>`;
+  };
+  document.getElementById('samples-note').textContent = E.samples.note || '';
+  document.getElementById('samples').innerHTML = `<table>
+    <thead><tr><th>Probe</th><th>Ground truth</th><th>Model output</th><th>Note</th></tr></thead>
+    <tbody>${E.samples.items.map(s => `<tr>
+      <td class="mono">${esc(s.id)}</td>
+      <td>${cell(s.gt)}</td>
+      <td>${cell(s.hyp)}</td>
+      <td class="win">${esc(s.note || '—')}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+if (show('sec-jobs', E.jobs && E.jobs.length)) {
+  document.getElementById('jobs').innerHTML = renderTable(
+    ['job', 'from step', 'to step', 'log last updated'],
+    E.jobs.map(j => [j.id, j.from, j.to, j.updated]));
+}
 </script>
 </body>
 </html>

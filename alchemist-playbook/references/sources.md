@@ -114,6 +114,7 @@ stated in that file are properties of the named benchmark:
 | Source | ID / link | Used for |
 | --- | --- | --- |
 | "Using Claude Code: the unreasonable effectiveness of HTML" (Thariq Shihipar, Anthropic) | claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html (2026-05) | `experiment-tracking.md`: HTML-over-Markdown artifact discipline — self-contained HTML for plans/reports, side-by-side comparison grids, artifact webs read by later sessions/verification agents. `[reported]` workflow practice, **not training evidence** — never cite it for a hyperparameter. |
+| FSQ-campaign dashboard (QwenVocabCodec) | eric-lam.com/vocodec/campaign (live page, retrieved 2026-07-11) | `experiment-tracking.md` §4 report-detail standard: the reference exemplar for dashboard depth — stat tiles with bounds/ETA, per-chart interpretation captions, hover-free eval table, gated experiment ladder, honest decision ledger ("NOT a gated comparison"), Slurm job chain, provenance footer. §4.8 (inference-vs-GT sample gallery) extends past the exemplar's noted gap: it shows no output-vs-ground-truth samples. `[reported]` presentation exemplar, **not training evidence**. |
 
 The git-commit-per-change and GitHub Pages mechanics in that file are
 standard git/GitHub product behavior; the Pages-is-public-even-for-private-

@@ -216,9 +216,17 @@ if optimization noticeably slows (rare).
   JSONs, and a framework-neutral 1B pretrain spec. Hand these to the user
   instead of writing configs from scratch; adjust values per the references.
 - `assets/templates/experiment_dashboard.html` — self-contained experiment
-  dashboard (run table, status chips, inline-SVG sparklines); data lives in
-  one JSON `const` at the top. Copy to `docs/index.html` in the experiment
-  repo and edit only that block per run.
+  dashboard implementing the report-detail standard (experiment-tracking.md
+  §4; the §4.8 agentic-RL collapsible-trajectory rendering is the one
+  extension left per-experiment): status-strip stat tiles, goal-progress
+  panel (target, gap, trend ETA, on/off-track), captioned SVG line
+  charts with TB/W&B-style smoothing (raw ghost) and log-y toggles, eval
+  table, sweep scatter, run/experiment ladder with gates + repro metadata,
+  decision ledger, inference-vs-GT sample gallery (text/audio/image), job
+  chain, staleness self-check banner, provenance footer. Data lives in one
+  JSON `const` at the top;
+  empty sections hide themselves. Copy to `docs/index.html` in the
+  experiment repo and edit only that block per run.
 
 ## Honesty rules
 
