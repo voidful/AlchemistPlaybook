@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alchemist Playbook — living documentation</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6;      /* with skill / primary */
+    --series-1-soft: #9ec5f4; /* blue ramp step 200 (range bars) */
+    --series-2: #eb6834;      /* without skill */
+    --good-text: #006300;
+    --code-bg: rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5;
+      --series-1-soft: #1c5cab; /* blue ramp step 550 (range bars, dark) */
+      --series-2: #d95926;
+      --good-text: #0ca30c;
+      --code-bg: rgba(255,255,255,0.07);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5;
+    --series-1-soft: #1c5cab;
+    --series-2: #d95926;
+    --good-text: #0ca30c;
+    --code-bg: rgba(255,255,255,0.07);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--text-primary);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: var(--series-1); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); border-radius: 4px; padding: 1px 5px; font-size: 0.9em; }
+  header {
+    padding: 36px 24px 12px; max-width: 1060px; margin: 0 auto;
+  }
+  header h1 { margin: 0 0 4px; font-size: 27px; }
+  header .sub { color: var(--text-secondary); max-width: 72ch; }
+  .toprow { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  #themeBtn {
+    background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 13px;
+  }
+  nav.chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 0; }
+  nav.chips a {
+    background: var(--surface-1); border: 1px solid var(--border); color: var(--text-secondary);
+    border-radius: 999px; padding: 5px 13px; font-size: 13px;
+  }
+  nav.chips a:hover { color: var(--text-primary); text-decoration: none; border-color: var(--baseline); }
+  main { max-width: 1060px; margin: 0 auto; padding: 8px 24px 64px; }
+  section { margin-top: 34px; }
+  h2 { font-size: 20px; margin: 0 0 4px; }
+  .lede { color: var(--text-secondary); margin: 0 0 14px; max-width: 78ch; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; margin-top: 12px;
+  }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .tile .v { font-size: 26px; font-weight: 650; }
+  .tile .v .up { color: var(--good-text); font-size: 15px; font-weight: 600; }
+  .tile .k { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px;
+       border-bottom: 1px solid var(--baseline); padding: 6px 10px 6px 0; }
+  td { border-bottom: 1px solid var(--grid); padding: 7px 10px 7px 0; vertical-align: top;
+       font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; border: 1px solid var(--border); border-radius: 999px;
+           padding: 0 8px; font-size: 11.5px; color: var(--text-secondary); white-space: nowrap; }
+  .badge.config { border-color: var(--good-text); color: var(--good-text); }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+  .filters input {
+    background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 13.5px; min-width: 240px;
+  }
+  .filters button.chip {
+    background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border);
+    border-radius: 999px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: 12.5px;
+  }
+  .filters button.chip[aria-pressed="true"] {
+    color: var(--text-primary); border-color: var(--series-1); font-weight: 600;
+  }
+  .count { color: var(--muted); font-size: 12.5px; margin-left: auto; }
+  figure { margin: 0; }
+  figcaption { color: var(--text-secondary); font-size: 13px; margin-top: 8px; max-width: 78ch; }
+  .legend { display: flex; gap: 18px; margin: 4px 0 10px; font-size: 13px; color: var(--text-secondary); }
+  .legend .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  svg text { font: 12px system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #tooltip {
+    position: fixed; pointer-events: none; display: none; z-index: 10;
+    background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--baseline);
+    border-radius: 8px; padding: 7px 11px; font-size: 12.5px; max-width: 300px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  }
+  #tooltip .t2 { color: var(--text-secondary); }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+  ol.timeline { list-style: none; margin: 6px 0 0; padding: 0; }
+  ol.timeline li { display: grid; grid-template-columns: 92px 1fr; gap: 14px; padding: 8px 0;
+                   border-bottom: 1px solid var(--grid); }
+  ol.timeline li:last-child { border-bottom: none; }
+  ol.timeline .d { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; padding-top: 1px; }
+  .decgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 12px; }
+  .inv { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+  .inv .card { margin-top: 0; padding: 14px 16px; }
+  .inv b { display: block; margin-bottom: 3px; }
+  .inv p, .decgrid p { margin: 4px 0 0; color: var(--text-secondary); font-size: 13.5px; }
+  footer { max-width: 1060px; margin: 0 auto; padding: 0 24px 48px; color: var(--muted); font-size: 12.5px; }
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .twocol { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="toprow">
+    <div>
+      <h1>Alchemist Playbook <span style="color:var(--muted);font-weight:400">· living documentation</span></h1>
+      <p class="sub">This skill gives evidence-based training advice (煉丹調參) to AI coding agents.
+      Each number comes from an official config, a paper, or a labeled heuristic.
+      This page is the <b>human road</b>. AI agents: read the
+      <a href="https://github.com/voidful/AlchemistPlaybook/blob/main/docs/index.md">markdown road</a>.</p>
+    </div>
+    <button id="themeBtn" aria-label="Toggle color theme">Theme: auto</button>
+  </div>
+  <nav class="chips">
+    <a href="#overview">Overview</a>
+    <a href="#routing">Routing</a>
+    <a href="#ladder">LR ladder</a>
+    <a href="#evals">Evals</a>
+    <a href="#sources">Sources</a>
+    <a href="#history">Decisions</a>
+    <a href="#governance">Governance</a>
+  </nav>
+</header>
+
+<main>
+  <section id="overview">
+    <div class="tiles" id="tiles"></div>
+    <div class="card">
+      <b>How the skill works.</b>
+      <p class="lede" style="margin-top:6px">
+      The skill first collects the facts about your run: task type, model, data, hardware,
+      symptom, and config. A <a href="#routing">routing table</a> then points to one evidence
+      file for each topic. The script <code>scripts/estimate.py</code> does all the arithmetic.
+      Each answer has four parts: <b>Diagnosis, Recipe, Evidence, and Verify</b>. The Recipe is a
+      config diff. Each change has a citation and a rollback plan. For tracked experiments, the
+      skill also makes an HTML report, one git commit for each change, and a GitHub Pages URL.
+      This page obeys the same rule.</p>
+    </div>
+  </section>
+
+  <section id="routing">
+    <h2>Routing table</h2>
+    <p class="lede">The table shows the file an agent reads before it answers. Each topic has one home.</p>
+    <div class="card" style="overflow-x:auto"><table id="routingTable"></table></div>
+  </section>
+
+  <section id="ladder">
+    <h2>Cross-stage learning-rate ladder</h2>
+    <p class="lede">The peak learning rate decreases approximately 10 times at each stage.
+    If your SFT learning rate is not less than your pretrain learning rate, that is the bug.
+    The dots show published values. Move the pointer over a dot to see its source.</p>
+    <div class="card">
+      <figure>
+        <div id="ladderChart"></div>
+        <figcaption>The chart shows published peak learning-rate ranges for each training stage.
+        The scale is logarithmic. The reference model size is 7B to 8B dense.
+        LoRA/QLoRA is the one exception: its rate is 10 to 20 times <em>more</em> than full SFT.</figcaption>
+      </figure>
+      <details><summary>Table view</summary><table id="ladderTable"></table></details>
+    </div>
+  </section>
+
+  <section id="evals">
+    <h2>Measured value: with vs without the skill</h2>
+    <p class="lede">We measured the skill in June 2026 (iteration 1). We used three realistic
+    debugging questions. We graded each answer against five expert expectations. We did this two
+    times: one time with the skill installed, and one time without it.</p>
+    <div class="card">
+      <div class="legend" id="evalLegend"></div>
+      <figure>
+        <div id="evalChart"></div>
+        <figcaption id="evalCaption"></figcaption>
+      </figure>
+      <details><summary>Table view — each expectation that failed without the skill</summary>
+        <table id="evalTable"></table>
+      </details>
+    </div>
+  </section>
+
+  <section id="sources">
+    <h2>Source bibliography</h2>
+    <p class="lede">The table lists each source the skill cites, with its verification level:
+    <span class="badge config">config</span> the value comes from an official config, script, or model card ·
+    <span class="badge">paper</span> the paper states the value ·
+    <span class="badge">reported</span> the value comes from a secondary source ·
+    <span class="badge">excluded</span> we examined the source and found no training evidence.</p>
+    <div class="filters">
+      <input id="srcSearch" type="search" placeholder="Search source, arXiv ID, topic…" aria-label="Search sources">
+      <span id="areaChips"></span>
+      <span class="count" id="srcCount"></span>
+    </div>
+    <div class="card" style="overflow-x:auto"><table id="srcTable"></table></div>
+  </section>
+
+  <section id="history">
+    <h2>Decisions &amp; history</h2>
+    <p class="lede">Decision records are append-only. We do not rewrite a decision.
+    A new record supersedes an old one. The commit log below shows each change to the project.</p>
+    <div class="decgrid" id="decisions"></div>
+    <div class="card">
+      <b style="font-size:13px;color:var(--muted)">COMMIT LOG</b>
+      <ol class="timeline" id="commits"></ol>
+    </div>
+  </section>
+
+  <section id="governance">
+    <h2>Governance — the six invariants</h2>
+    <p class="lede">The six rules below control changes to this repository. They come from
+    <a href="https://github.com/ejklock/living-docs-skill">living-docs-skill</a>. The full text is in the
+    <a href="https://github.com/voidful/AlchemistPlaybook/blob/main/docs/constitution.md">constitution</a>.
+    The script <code>scripts/check_docs.py</code> checks them automatically.</p>
+    <div class="inv" id="invariants"></div>
+    <div class="card twocol" style="margin-top:14px">
+      <div><b>Human road</b><p class="lede" style="margin:4px 0 0">This page. It is one file
+        (<code>docs/index.html</code>) with no external resources. To change the facts, edit the
+        <code>DATA</code> block only. To publish, use GitHub Pages (main branch, <code>/docs</code> folder).</p></div>
+      <div><b>Agent road</b><p class="lede" style="margin:4px 0 0">Start at
+        <a href="https://github.com/voidful/AlchemistPlaybook/blob/main/docs/index.md">docs/index.md</a>.
+        It links to the constitution, architecture, conventions, glossary, workflows, and decisions.
+        The agent contract is
+        <a href="https://github.com/voidful/AlchemistPlaybook/blob/main/AGENTS.md">AGENTS.md</a>.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer id="provenance"></footer>
+<div id="tooltip" role="tooltip"></div>
+
+<script>
+// ============================================================================
+// DATA — the only block to edit when facts change (docs/conventions.md).
+// ============================================================================
+const DATA = {
+  updated: "2026-08-19",
+  repo: "https://github.com/voidful/AlchemistPlaybook",
+  stats: [
+    { v: "auto:sources", k: "sources in the bibliography" },
+    { v: "10", k: "routed reference files" },
+    { v: "8",  k: "ready-to-edit config templates" },
+    { v: "15/15", k: "eval expectations passed (11/15 without the skill)", up: "+4" },
+    { v: "4",  k: "decision records" },
+    { v: "≤1024", k: "hard cap on trigger description (chars)" }
+  ],
+  routing: [
+    { topic: "Pretraining from scratch — schedules (cosine/WSD), batch ramp, data mixes, midtraining/annealing, distillation, curriculum, edge architectures", file: "pretraining.md" },
+    { topic: "Post-training — SFT, DPO, SimPO, ORPO, KTO, PPO, GRPO, RLVR, reward models, model merging", file: "post-training.md" },
+    { topic: "Stability — loss spikes, NaN, divergence, grad-norm anomalies, precision, QK-norm, z-loss, MuonClip", file: "stability.md" },
+    { topic: "PEFT — LoRA, QLoRA, low-budget fine-tuning", file: "peft.md" },
+    { topic: "Speech — ASR, speech translation, SSL, Whisper/OWSM, ESPnet", file: "speech.md" },
+    { topic: "Scaling — compute/token budgets, Chinchilla, critical batch size, LR–batch coupling, muP, MFU", file: "scaling-and-batch.md" },
+    { topic: "Diagnostics — symptom → cause → fix, monitoring setup, pre-launch checklist", file: "diagnostics.md" },
+    { topic: "Evaluation — per-stage metrics and benchmarks, three-tier framework, retention suite, release gate", file: "evaluation.md" },
+    { topic: "Experiment tracking — HTML artifacts per change, dashboards, git discipline, GitHub Pages", file: "experiment-tracking.md" },
+    { topic: "Bibliography with verification status", file: "sources.md" }
+  ],
+  ladder: {
+    domain: [1e-7, 1e-3],
+    stages: [
+      { name: "Pretrain",        lo: 1e-4, hi: 6e-4, anchors: [
+        { lr: 3e-4,  who: "LLaMA-7B/13B, OLMo-7B [config]" },
+        { lr: 5e-4,  who: "SmolLM2-1.7B, 11T tokens" },
+        { lr: 6e-4,  who: "OLMo-2-32B [config]" },
+        { lr: 8e-5,  who: "Llama 3 405B (below band — scale)" } ] },
+      { name: "Full SFT",        lo: 2e-6, hi: 2e-5, anchors: [
+        { lr: 5e-6,  who: "Tulu 3 [config]" },
+        { lr: 2e-5,  who: "Zephyr, Llama-2-chat [config]" } ] },
+      { name: "DPO",             lo: 2e-7, hi: 1e-6, anchors: [
+        { lr: 5e-7,  who: "Zephyr, Tulu 3 8B [config]" },
+        { lr: 2e-7,  who: "Tulu 3 70B+" } ] },
+      { name: "PPO / RLVR",      lo: 3e-7, hi: 1e-6, anchors: [
+        { lr: 3e-7,  who: "Tulu 3 PPO [config]" },
+        { lr: 1e-6,  who: "GRPO (DeepSeekMath)" } ] },
+      { name: "LoRA/QLoRA SFT",  lo: 1e-4, hi: 2e-4, exception: true, anchors: [
+        { lr: 2e-4,  who: "QLoRA 7–13B" },
+        { lr: 1e-4,  who: "QLoRA 33–65B" } ] }
+    ]
+  },
+  evals: {
+    max: 5,
+    series: ["With skill", "Without skill"],
+    rows: [
+      { name: "Pretrain loss-spike debug",  withSkill: 5, withoutSkill: 3 },
+      { name: "DPO config review (β confusion)", withSkill: 5, withoutSkill: 4 },
+      { name: "Speech warmup divergence",   withSkill: 5, withoutSkill: 4 }
+    ],
+    misses: [
+      { eval: "Pretrain loss-spike debug", missed: "Recommended keeping ε=1e-5 — contradicts OLMo 2's published stability change to 1e-8" },
+      { eval: "Pretrain loss-spike debug", missed: "No verification plan: no success criterion, observation window, or rollback" },
+      { eval: "DPO config review", missed: "Treated β=5 as simply too large; missed that it is Tulu 3's correct value under length-normalized DPO" },
+      { eval: "Speech warmup divergence", missed: "No named published speech recipe (OWSM v3.1 / Whisper) — generic advice only" }
+    ]
+  },
+  sourceAreas: ["Pretraining", "Post-training", "Speech", "Systems", "Benchmarks", "Workflow"],
+  sources: [
+    { n: "LLaMA", id: "2302.13971", a: "Pretraining", v: "paper", u: "Per-size LRs, 4M batch, AdamW (0.9, 0.95), wd 0.1, cosine→10%" },
+    { n: "Llama 2", id: "2307.09288", a: "Pretraining", v: "paper", u: "2T tokens, GQA; SFT 2e-5 / 2 epochs; RLHF structure" },
+    { n: "Llama 3 herd", id: "2407.21783", a: "Pretraining", v: "paper", u: "405B: 8e-5 peak, warmup 8K, batch ramp 4M→16M, MFU 38–43%" },
+    { n: "OLMo", id: "2402.00838", a: "Pretraining", v: "paper", u: "1B/7B LRs, warmup 5000, in-loop eval cadence" },
+    { n: "OLMo 2", id: "2501.00656", a: "Pretraining", v: "config", u: "Stability stack: QK-norm, z-loss 1e-5, ε 1e-8; Dolmino annealing + souping" },
+    { n: "OLMo 2 32B script", id: "OLMo-core", a: "Pretraining", v: "config", u: "lr 6e-4, 8.4M batch, HSDP", link: "https://github.com/allenai/OLMo-core" },
+    { n: "OLMo 3", id: "2512.13961", a: "Pretraining", v: "paper", u: "3-stage curriculum; model-flow post-training (SFT→DPO→RLVR)" },
+    { n: "SmolLM2", id: "2502.02737", a: "Pretraining", v: "paper", u: "1.7B: 5e-4 WSD, 2M batch, 11T tokens, staged mixtures" },
+    { n: "Pythia", id: "2304.01373", a: "Pretraining", v: "paper", u: "Controlled suite; checkpoint density for dynamics studies" },
+    { n: "DeepSeek-V3", id: "2412.19437", a: "Pretraining", v: "paper", u: "Multi-phase LR, batch ramp, FP8 tile-wise scaling, MTP" },
+    { n: "DeepSeek LLM scaling", id: "2401.02954", a: "Pretraining", v: "paper", u: "Batch ↑ / LR ↓ trends with compute" },
+    { n: "MiniCPM", id: "2404.06395", a: "Pretraining", v: "paper", u: "WSD origin; decay-phase loss drop; muP-style transfer" },
+    { n: "Chinchilla", id: "2203.15556", a: "Pretraining", v: "paper", u: "~20 tokens/param compute-optimal" },
+    { n: "Data-constrained scaling", id: "2305.16264", a: "Pretraining", v: "paper", u: "~4 epochs of repeated data ≈ fresh data" },
+    { n: "FineWeb", id: "2406.17557", a: "Pretraining", v: "paper", u: "Dedup/filtering ablations; FineWeb-Edu classifier" },
+    { n: "PaLM", id: "2204.02311", a: "Pretraining", v: "paper", u: "Spike SOP (rewind + skip batches), z-loss 1e-4, batch ramp" },
+    { n: "Kimi K2", id: "2507.20534", a: "Pretraining", v: "paper", u: "MuonClip / QK-Clip τ=100; 15.5T tokens zero-spike claim" },
+    { n: "Moonlight (Muon)", id: "2502.16982", a: "Pretraining", v: "paper", u: "Muon at scale: weight decay required, ≈52% FLOPs vs AdamW" },
+    { n: "muP / TP-V", id: "2203.03466", a: "Pretraining", v: "paper", u: "Width-transferable LR" },
+    { n: "Critical batch size", id: "1812.06162", a: "Pretraining", v: "paper", u: "Gradient noise scale; ramp justification" },
+    { n: "GLM-130B", id: "2210.02414", a: "Pretraining", v: "paper", u: "Embedding gradient shrink α=0.1" },
+    { n: "Spike No More", id: "2312.16903", a: "Pretraining", v: "paper", u: "Embedding scale + small init for spike prevention" },
+    { n: "Small-scale proxies", id: "2309.14322", a: "Pretraining", v: "paper", u: "QK-norm + z-loss validation; LR sensitivity grows with scale" },
+    { n: "BLOOM", id: "2211.05100", a: "Pretraining", v: "paper", u: "fp16 instability lesson → bf16" },
+    { n: "Ultra-Scale Playbook", id: "nanotron", a: "Pretraining", v: "reported", u: "Distributed-training systematics (4000+ runs); FP8 < bf16 stability", link: "https://huggingface.co/spaces/nanotron/ultrascale-playbook" },
+    { n: "LFM2", id: "2511.23404", a: "Pretraining", v: "paper", u: "Edge hybrid conv+GQA; top-K distillation; difficulty curriculum; merging stage" },
+    { n: "GLM-5", id: "2602.15763", a: "Pretraining", v: "paper", u: "744B/40B MoE; Muon Split; DSA sparse-attention retrofit; INT4 QAT" },
+    { n: "EvoLM", id: "2506.16029", a: "Pretraining", v: "config", u: "Full-pipeline ablation, 100+ models; downstream saturation ~80–160 tok/param" },
+    { n: "Zephyr", id: "2310.16944", a: "Post-training", v: "config", u: "SFT 2e-5 / cosine / 1 ep; DPO 5e-7, β 0.01, 1 ep" },
+    { n: "Tulu 3", id: "2411.15124", a: "Post-training", v: "config", u: "SFT 5e-6; length-norm DPO β5, 5e-7; full RLVR PPO table (3e-7)" },
+    { n: "DPO", id: "2305.18290", a: "Post-training", v: "paper", u: "β 0.1 convention; objective" },
+    { n: "IPO", id: "2310.12036", a: "Post-training", v: "paper", u: "Bounded squared-loss preference objective; τ ≠ DPO β" },
+    { n: "RLAIF / Constitutional AI", id: "2309.00267", a: "Post-training", v: "paper", u: "AI-annotated preference labels; judge-bias caveat" },
+    { n: "SimPO", id: "2405.14734", a: "Post-training", v: "config", u: "Per-setting β/γ/LR tables; LR-damage evidence" },
+    { n: "ORPO", id: "2403.07691", a: "Post-training", v: "config", u: "Single-stage alignment: β 0.05, 5e-6, inverse-sqrt, 3 ep" },
+    { n: "KTO", id: "2402.01306", a: "Post-training", v: "paper", u: "Unpaired preference" },
+    { n: "DeepSeekMath / GRPO", id: "2402.03300", a: "Post-training", v: "paper", u: "GRPO lr 1e-6, KL 0.04, G=64" },
+    { n: "DeepSeek-R1", id: "2501.12948", a: "Post-training", v: "paper", u: "Rule-based rewards; R1-Zero pipeline" },
+    { n: "InstructGPT", id: "2203.02155", a: "Post-training", v: "paper", u: "SFT-epochs vs RM-quality nuance" },
+    { n: "NEFTune", id: "2310.05914", a: "Post-training", v: "paper", u: "Embedding-noise α 5/10/15" },
+    { n: "LoRA", id: "2106.09685", a: "Post-training", v: "paper", u: "Low-rank adaptation basics" },
+    { n: "QLoRA", id: "2305.14314", a: "Post-training", v: "paper", u: "NF4 + double-quant + paged optimizers; r64/α16; 1e-4–2e-4" },
+    { n: "LoRA learns less, forgets less", id: "2405.09673", a: "Post-training", v: "paper", u: "LoRA vs full-FT decision rule; higher-LR requirement" },
+    { n: "VibeThinker-1.5B", id: "2511.06221", a: "Post-training", v: "paper", u: "Spectrum-to-Signal (SFT=diversity, RL=signal); MGPO; <$8K post-training" },
+    { n: "VibeThinker-3B", id: "2606.16140", a: "Post-training", v: "paper", u: "Curriculum SFT; single-window multi-domain MGPO RLVR; CLR test-time scaling" },
+    { n: "PivotRL (NVIDIA)", id: "2603.21383", a: "Post-training", v: "paper", u: "Turn-level local RL on SFT trajectories; pivot filtering; ~5.5× less wall-clock than E2E" },
+    { n: "Agents-A1", id: "2606.30616", a: "Post-training", v: "paper", u: "Multi-teacher domain-routed on-policy distillation repairs multi-domain SFT regression" },
+    { n: "Program-as-Weights", id: "2607.02512", a: "Post-training", v: "paper", u: "Hypernetwork-generated LoRA beats full FT on same data; rank saturation" },
+    { n: "FAC Synthesis", id: "2602.10388", a: "Post-training", v: "paper", u: "SAE feature coverage as diversity metric; Distinct-n anti-correlates" },
+    { n: "GLM-5 (post-training)", id: "2602.15763", a: "Post-training", v: "paper", u: "IcePop mismatch mask; async agentic RL (slime); cross-stage distillation" },
+    { n: "Rethinking OPD (THUNLP)", id: "2604.13016", a: "Post-training", v: "config", u: "OPD preconditions (pattern match + teacher novelty); overlap-ratio diagnostic; cold-start recovery" },
+    { n: "Whisper", id: "2212.04356", a: "Speech", v: "paper", u: "Per-size LRs (1.5e-3→1.75e-4), β₂ 0.98, ε 1e-6, warmup 2048" },
+    { n: "OWSM v3.1", id: "2401.16658", a: "Speech", v: "config", u: "Piecewise warmup 60K, peak 2e-4 (medium), CTC 0.3" },
+    { n: "OWSM v4", id: "2506.00338", a: "Speech", v: "paper", u: "CTC-segmentation realign → filter 370K→166K h; data-first lesson" },
+    { n: "wav2vec 2.0", id: "2006.11477", a: "Speech", v: "paper", u: "SSL pretrain + tri-stage fine-tune" },
+    { n: "HuBERT", id: "2106.07447", a: "Speech", v: "paper", u: "Iterative cluster targets" },
+    { n: "ESPnet", id: "espnet", a: "Speech", v: "reported", u: "Working defaults: CTC 0.3, label smoothing 0.1, warmup 25–40K", link: "https://github.com/espnet/espnet" },
+    { n: "ZeRO", id: "1910.02054", a: "Systems", v: "paper", u: "Memory/throughput moves in diagnostics and templates" },
+    { n: "FSDP", id: "2304.11277", a: "Systems", v: "paper", u: "Sharded data parallel" },
+    { n: "FlashAttention", id: "2205.14135", a: "Systems", v: "paper", u: "Attention memory/throughput" },
+    { n: "Activation checkpointing", id: "1604.06174", a: "Systems", v: "paper", u: "Memory-for-compute trade" },
+    { n: "MMLU / MMLU-Pro", id: "2009.03300", a: "Benchmarks", v: "paper", u: "MMLU-Pro: 10 options, better strong-model discrimination" },
+    { n: "IFEval", id: "2311.07911", a: "Benchmarks", v: "paper", u: "~25 auto-verifiable instruction types; strict/loose accuracy" },
+    { n: "RULER", id: "2404.06654", a: "Benchmarks", v: "paper", u: "Configurable-length long-context; > vanilla needle-in-haystack" },
+    { n: "SimpleQA", id: "2411.04368", a: "Benchmarks", v: "paper", u: "Short fact-seeking factuality" },
+    { n: "HarmBench", id: "2402.04249", a: "Benchmarks", v: "paper", u: "Safety red-team + robust-refusal eval" },
+    { n: "GPQA", id: "2311.12022", a: "Benchmarks", v: "paper", u: "Graduate-level science reasoning" },
+    { n: "BFCL", id: "gorilla", a: "Benchmarks", v: "reported", u: "Function/tool-calling eval", link: "https://gorilla.cs.berkeley.edu/leaderboard" },
+    { n: "τ-bench", id: "2406.12045", a: "Benchmarks", v: "paper", u: "Tool-agent task success in dynamic dialogue" },
+    { n: "SWE-bench (Verified)", id: "2310.06770", a: "Benchmarks", v: "paper", u: "Repo-level resolved rate" },
+    { n: "LiveCodeBench", id: "2403.07974", a: "Benchmarks", v: "paper", u: "Contamination-resistant, time-windowed code eval" },
+    { n: "AlpacaEval 2 / Arena-Hard / MT-Bench", id: "2404.04475", a: "Benchmarks", v: "paper", u: "LLM-judge win-rate / Elo (relative, judge-dependent)" },
+    { n: "HTML-artifact workflow (Anthropic blog)", id: "claude.com", a: "Workflow", v: "reported", u: "HTML-over-Markdown artifact discipline — never cited for hyperparameters", link: "https://claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html" },
+    { n: "FSQ-campaign dashboard", id: "exemplar", a: "Workflow", v: "reported", u: "Report-detail exemplar for §4 dashboard standard — not training evidence" },
+    { n: "little-coder / smallcode", id: "excluded", a: "Workflow", v: "excluded", u: "Reviewed in full: no training runs — kept only as harness-quality triage context" }
+  ],
+  decisions: [
+    { id: "0001", d: "2026-06-12", t: "Evidence-based routing skill", p: "Every value traces to a source or is labeled heuristic; thin SKILL.md + routed reference files; fixed Diagnosis/Recipe/Evidence/Verify format.", f: "0001-evidence-based-routing-skill.md" },
+    { id: "0002", d: "2026-06-15", t: "Three-tier evaluation framework", p: "Health monitoring ≠ capability evaluation ≠ release gate; retention suite for mid-training.", f: "0002-three-tier-evaluation-framework.md" },
+    { id: "0003", d: "2026-07-11", t: "HTML-artifact experiment tracking", p: "Every experiment change gets a self-contained HTML artifact, a commit, and a Pages URL — the commit log is the ablation log.", f: "0003-html-artifact-experiment-tracking.md" },
+    { id: "0004", d: "2026-08-19", t: "Two-road documentation", p: "Interactive HTML for humans (this page), indexed markdown for agents; six governance invariants; deterministic checker.", f: "0004-two-road-documentation.md" }
+  ],
+  commits: [
+    { d: "2026-08-19", s: "Adopt two-road living documentation (decision 0004)" },
+    { d: "2026-07-11", s: "Raise report standard to FSQ-campaign exemplar and beyond; rebuild dashboard template" },
+    { d: "2026-07-11", s: "Add experiment-tracking workflow: HTML artifacts + git + GitHub Pages" },
+    { d: "2026-07-07", s: "Add Agents-A1, EvoLM, PAW, FAC-Synthesis; correct PivotRL numbers; IPO/RLAIF" },
+    { d: "2026-07-02", s: "Add PivotRL turn-level local RL recipe" },
+    { d: "2026-07-02", s: "Trim skill description; repackage with GLM-5" },
+    { d: "2026-07-02", s: "Add GLM-5 recipe: DSA retrofit, Muon Split, async agentic RL" },
+    { d: "2026-06-18", s: "Add VibeThinker 1.5B/3B small-model-reasoning lessons" },
+    { d: "2026-06-15", s: "Add LFM2 lessons and a per-stage evaluation/monitoring framework" },
+    { d: "2026-06-12", s: "Initial alchemist playbook skill" }
+  ],
+  invariants: [
+    { t: "1 · Docs-first", p: "Write in the repository first. The .skill archive and this page are build outputs." },
+    { t: "2 · One home per fact", p: "Each fact has one home. Training knowledge is in the skill. Repository knowledge is in docs/. If two files show the same number, one file is wrong." },
+    { t: "3 · Indexed or it does not exist", p: "Each doc must have a link from docs/index.md. Each reference file must be in the routing table. Each source must be in sources.md." },
+    { t: "4 · Supersede, never rewrite", p: "Do not rewrite a decision. Add a new record that points to the old one." },
+    { t: "5 · No structural change without its doc", p: "Change the structure and its doc in the same commit." },
+    { t: "6 · Evidence-marked or labeled heuristic", p: "Mark each value: [config], [paper], [reported], or [heuristic]. A value without a mark cannot merge." }
+  ]
+};
+
+// ============================================================================
+// Rendering (no external dependencies; colors via CSS variables)
+// ============================================================================
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const refUrl = (f) => DATA.repo + "/blob/main/alchemist-playbook/references/" + f;
+
+// --- theme toggle (auto → light → dark) ---
+const themeBtn = $("#themeBtn");
+const themes = ["auto", "light", "dark"];
+let themeIdx = 0;
+themeBtn.addEventListener("click", () => {
+  themeIdx = (themeIdx + 1) % 3;
+  const t = themes[themeIdx];
+  if (t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", t);
+  themeBtn.textContent = "Theme: " + t;
+});
+
+// --- tooltip ---
+const tip = $("#tooltip");
+function showTip(e, html) {
+  tip.innerHTML = html;
+  tip.style.display = "block";
+  const pad = 14, w = tip.offsetWidth;
+  let x = e.clientX + pad;
+  if (x + w > innerWidth - 8) x = e.clientX - w - pad;
+  tip.style.left = x + "px";
+  tip.style.top = Math.min(e.clientY + pad, innerHeight - tip.offsetHeight - 8) + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+
+// --- stat tiles ("auto:sources" = counted from DATA so it cannot drift) ---
+$("#tiles").innerHTML = DATA.stats.map(s => {
+  const v = s.v === "auto:sources" ? String(DATA.sources.length) : s.v;
+  return `<div class="tile"><div class="v">${esc(v)}${s.up ? ` <span class="up">${esc(s.up)}</span>` : ""}</div><div class="k">${esc(s.k)}</div></div>`;
+}).join("");
+
+// --- routing table ---
+$("#routingTable").innerHTML = "<thead><tr><th>Topic</th><th>Home</th></tr></thead><tbody>" +
+  DATA.routing.map(r =>
+    `<tr><td>${esc(r.topic)}</td><td style="white-space:nowrap"><a href="${refUrl(r.file)}"><code>${esc(r.file)}</code></a></td></tr>`).join("") + "</tbody>";
+
+// --- LR ladder chart (log-x range chart, single hue; identity via row labels) ---
+(function ladder() {
+  const L = DATA.ladder, W = 960, rowH = 46, padL = 150, padR = 30, padT = 26, padB = 30;
+  const H = padT + L.stages.length * rowH + padB;
+  const [d0, d1] = L.domain.map(Math.log10);
+  const x = (lr) => padL + (Math.log10(lr) - d0) / (d1 - d0) * (W - padL - padR);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Peak learning-rate ranges by training stage, log scale">`;
+  for (let e = Math.ceil(d0); e <= Math.floor(d1); e++) {
+    const gx = x(Math.pow(10, e));
+    s += `<line x1="${gx}" y1="${padT - 8}" x2="${gx}" y2="${H - padB}" stroke="var(--grid)" stroke-width="1"/>`;
+    s += `<text x="${gx}" y="${H - padB + 18}" text-anchor="middle" fill="var(--muted)">1e${e}</text>`;
+  }
+  L.stages.forEach((st, i) => {
+    const cy = padT + i * rowH + rowH / 2;
+    const x0 = x(st.lo), x1 = x(st.hi);
+    s += `<text x="${padL - 12}" y="${cy + 4}" text-anchor="end" fill="var(--text-primary)" font-weight="600">${esc(st.name)}</text>`;
+    if (st.exception) s += `<text x="${padL - 12}" y="${cy + 18}" text-anchor="end" fill="var(--muted)" font-size="10.5">exception: ~10–20×</text>`;
+    s += `<rect class="lad" data-i="${i}" x="${x0}" y="${cy - 7}" width="${Math.max(x1 - x0, 4)}" height="14" rx="4" fill="var(--series-1-soft)"${st.exception ? ' stroke="var(--series-1)" stroke-width="1.5" stroke-dasharray="4 3"' : ""}/>`;
+    st.anchors.forEach((a, j) => {
+      s += `<circle class="anc" data-i="${i}" data-j="${j}" cx="${x(a.lr)}" cy="${cy}" r="4.5" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2"/>`;
+    });
+    s += `<text x="${x1 + 8}" y="${cy + 4}" fill="var(--text-secondary)" font-size="11">${st.lo.toExponential(0).replace("e-", "e-")}–${st.hi.toExponential(0)}</text>`;
+  });
+  s += "</svg>";
+  $("#ladderChart").innerHTML = s;
+  document.querySelectorAll("#ladderChart .anc").forEach(c => {
+    const st = L.stages[+c.dataset.i], a = st.anchors[+c.dataset.j];
+    c.addEventListener("mousemove", e => showTip(e, `<b>${a.lr.toExponential(1)}</b><div class="t2">${esc(a.who)}</div>`));
+    c.addEventListener("mouseleave", hideTip);
+  });
+  document.querySelectorAll("#ladderChart .lad").forEach(r => {
+    const st = L.stages[+r.dataset.i];
+    r.addEventListener("mousemove", e => showTip(e, `<b>${esc(st.name)}</b><div class="t2">published range ${st.lo.toExponential(0)} – ${st.hi.toExponential(0)}</div>`));
+    r.addEventListener("mouseleave", hideTip);
+  });
+  $("#ladderTable").innerHTML = "<thead><tr><th>Stage</th><th>Range</th><th>Anchors</th></tr></thead><tbody>" +
+    L.stages.map(st => `<tr><td>${esc(st.name)}</td><td>${st.lo.toExponential(0)} – ${st.hi.toExponential(0)}</td><td>${st.anchors.map(a => `${a.lr.toExponential(1)} (${esc(a.who)})`).join("; ")}</td></tr>`).join("") + "</tbody>";
+})();
+
+// --- eval grouped bar chart (2 validated series) ---
+(function evals() {
+  const E = DATA.evals, W = 960, H = 250, padL = 44, padR = 16, padT = 16, padB = 44;
+  const groupW = (W - padL - padR) / E.rows.length, barW = 52, gap = 2;
+  const y = (v) => padT + (1 - v / E.max) * (H - padT - padB);
+  const cols = ["var(--series-1)", "var(--series-2)"];
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Eval expectations passed, with skill versus without, per eval">`;
+  for (let v = 0; v <= E.max; v++) {
+    s += `<line x1="${padL}" y1="${y(v)}" x2="${W - padR}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`;
+    s += `<text x="${padL - 8}" y="${y(v) + 4}" text-anchor="end" fill="var(--muted)">${v}</text>`;
+  }
+  E.rows.forEach((r, i) => {
+    const cx = padL + groupW * i + groupW / 2;
+    [r.withSkill, r.withoutSkill].forEach((v, k) => {
+      const bx = cx - barW - gap / 2 + k * (barW + gap);
+      const by = y(v), bh = y(0) - by;
+      s += `<rect class="bar" data-i="${i}" data-k="${k}" x="${bx}" y="${by}" width="${barW}" height="${Math.max(bh, 2)}" fill="${cols[k]}" rx="4"/>`;
+      s += `<rect x="${bx}" y="${y(0) - 3}" width="${barW}" height="3" fill="${cols[k]}"/>`;
+      s += `<text x="${bx + barW / 2}" y="${by - 6}" text-anchor="middle" fill="var(--text-secondary)" font-weight="600">${v}/${E.max}</text>`;
+    });
+    s += `<text x="${cx}" y="${H - padB + 20}" text-anchor="middle" fill="var(--text-secondary)">${esc(r.name)}</text>`;
+  });
+  s += `<line x1="${padL}" y1="${y(0)}" x2="${W - padR}" y2="${y(0)}" stroke="var(--baseline)" stroke-width="1.5"/>`;
+  s += "</svg>";
+  $("#evalChart").innerHTML = s;
+  $("#evalLegend").innerHTML = E.series.map((n, k) =>
+    `<span><span class="sw" style="background:${cols[k]}"></span>${esc(n)}</span>`).join("");
+  document.querySelectorAll("#evalChart .bar").forEach(b => {
+    const r = E.rows[+b.dataset.i], k = +b.dataset.k;
+    const v = k === 0 ? r.withSkill : r.withoutSkill;
+    b.addEventListener("mousemove", e => showTip(e,
+      `<b>${esc(r.name)}</b><div class="t2">${esc(E.series[k])}: ${v}/${E.max} expectations (${Math.round(v / E.max * 100)}%)</div>`));
+    b.addEventListener("mouseleave", hideTip);
+  });
+  const tw = E.rows.reduce((a, r) => a + r.withSkill, 0), to = E.rows.reduce((a, r) => a + r.withoutSkill, 0), tt = E.rows.length * E.max;
+  $("#evalCaption").textContent =
+    `The chart shows the expectations that passed for each eval (maximum ${E.max}). ` +
+    `Total with the skill: ${tw}/${tt}. Total without the skill: ${to}/${tt}. ` +
+    `The skill's references contain each fact that the without-skill answers missed.`;
+  $("#evalTable").innerHTML = "<thead><tr><th>Eval</th><th>Missed without the skill</th></tr></thead><tbody>" +
+    E.misses.map(m => `<tr><td style="white-space:nowrap">${esc(m.eval)}</td><td>${esc(m.missed)}</td></tr>`).join("") + "</tbody>";
+})();
+
+// --- sources: search + area filter ---
+(function sources() {
+  let area = "All", q = "";
+  const chips = ["All", ...DATA.sourceAreas];
+  $("#areaChips").innerHTML = chips.map(c =>
+    `<button class="chip" data-a="${esc(c)}" aria-pressed="${c === "All"}">${esc(c)}</button>`).join(" ");
+  const badge = (v) => `<span class="badge ${v === "config" ? "config" : ""}">${esc(v)}</span>`;
+  const idCell = (s2) => {
+    const url = s2.link || (/^\d{4}\.\d{4,5}$/.test(s2.id) ? "https://arxiv.org/abs/" + s2.id : null);
+    return url ? `<a href="${url}">${esc(s2.id)}</a>` : esc(s2.id);
+  };
+  function render() {
+    const ql = q.toLowerCase();
+    const rows = DATA.sources.filter(s2 =>
+      (area === "All" || s2.a === area) &&
+      (!ql || (s2.n + " " + s2.id + " " + s2.u + " " + s2.a).toLowerCase().includes(ql)));
+    $("#srcTable").innerHTML =
+      "<thead><tr><th>Source</th><th>ID</th><th>Area</th><th>Level</th><th>What the skill uses it for</th></tr></thead><tbody>" +
+      rows.map(s2 => `<tr><td style="white-space:nowrap"><b>${esc(s2.n)}</b></td><td style="white-space:nowrap">${idCell(s2)}</td><td>${esc(s2.a)}</td><td>${badge(s2.v)}</td><td>${esc(s2.u)}</td></tr>`).join("") +
+      "</tbody>";
+    $("#srcCount").textContent = rows.length + " of " + DATA.sources.length + " sources";
+  }
+  document.querySelectorAll("#areaChips .chip").forEach(b => b.addEventListener("click", () => {
+    area = b.dataset.a;
+    document.querySelectorAll("#areaChips .chip").forEach(x2 => x2.setAttribute("aria-pressed", x2 === b));
+    render();
+  }));
+  $("#srcSearch").addEventListener("input", (e) => { q = e.target.value; render(); });
+  render();
+})();
+
+// --- decisions + commits ---
+$("#decisions").innerHTML = DATA.decisions.map(d =>
+  `<div class="card"><div style="color:var(--muted);font-size:12px">${esc(d.d)} · <a href="${DATA.repo}/blob/main/docs/decisions/${esc(d.f)}">#${esc(d.id)}</a></div><b>${esc(d.t)}</b><p>${esc(d.p)}</p></div>`).join("");
+$("#commits").innerHTML = DATA.commits.map(c =>
+  `<li><span class="d">${esc(c.d)}</span><span>${esc(c.s)}</span></li>`).join("");
+
+// --- invariants ---
+$("#invariants").innerHTML = DATA.invariants.map(i =>
+  `<div class="card"><b>${esc(i.t)}</b><p>${esc(i.p)}</p></div>`).join("");
+
+// --- provenance footer ---
+$("#provenance").innerHTML =
+  `Self-contained report · data updated ${esc(DATA.updated)} · source of truth: ` +
+  `<a href="${DATA.repo}">voidful/AlchemistPlaybook</a> · edit only the <code>DATA</code> block ` +
+  `(<a href="${DATA.repo}/blob/main/docs/conventions.md">conventions</a>) · validated by <code>scripts/check_docs.py</code>`;
+</script>
+</body>
+</html>

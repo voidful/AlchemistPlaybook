@@ -1,0 +1,60 @@
+---
+type: glossary
+title: Glossary
+status: active
+updated: 2026-08-19
+---
+
+# Glossary
+
+One home per term. Add new terms here, alphabetically within each group,
+rather than redefining them inside other docs.
+
+## Project terms
+
+- **煉丹調參** ("alchemy tuning") — Chinese ML-community idiom for the craft
+  of training-run hyperparameter tuning; 煉丹 = "refining the elixir"
+  (running training), 調參 = "adjusting parameters". The skill's founding
+  frame: turn this folklore into cited engineering.
+- **The skill** — `alchemist-playbook/`, the source directory packaged into
+  `alchemist-playbook.skill`.
+- **Routing table** — the topic → reference-file map in SKILL.md that tells
+  an agent which evidence file to read before answering.
+- **Workspace** — `alchemist-playbook-workspace/`, holding eval definitions
+  and per-iteration results; never packaged into the archive.
+- **Two roads** — this repo's documentation split: interactive HTML for
+  humans (`docs/index.html`), indexed markdown for agents (`docs/index.md`).
+  See decision 0004.
+
+## Verification levels
+
+- **`[config]`** — value read directly from an official config file,
+  training script, or model card maintained by the releasing org. Highest
+  trust.
+- **`[paper]`** — value stated in the technical report/paper.
+- **`[reported]`** — secondary source or community-standard value; flag when
+  precision matters.
+- **`[heuristic]`** — no published backing; an explicitly labeled judgment
+  call. Also used for practitioner syntheses (e.g., the three-tier eval
+  framework).
+
+## Training terms the docs rely on
+
+(Defined here only as needed to read the docs; the skill files are the home
+for their full treatment.)
+
+- **Consensus baseline** — the default optimizer/schedule/batch stack in
+  SKILL.md, the de-facto intersection of LLaMA 1–3, OLMo 1–3, SmolLM2, and
+  DeepSeek-V3.
+- **LR ladder** — the skill's rule that peak learning rate drops roughly an
+  order of magnitude per stage (pretrain → SFT → DPO → PPO/RLVR), with
+  LoRA/QLoRA as the documented exception (~10–20× above full-FT SFT).
+- **Three-tier evaluation** — health monitoring ("is the run alive") vs
+  capability evaluation ("is it getting stronger without forgetting") vs
+  release gate ("can it ship" — a private holdout). Home:
+  `references/evaluation.md`.
+- **WSD** — warmup–stable–decay LR schedule; alternative to cosine when the
+  total token budget is undecided.
+- **With/without-skill eval** — the workspace's A/B method: the same prompt
+  graded against expert expectations with the skill installed and without;
+  the delta is the skill's measured value.
