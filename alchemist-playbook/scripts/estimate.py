@@ -92,7 +92,7 @@ def cmd_batch(a):
 
 LADDER = {
     "pretrain": [
-        (2e9, "4e-4 - 1e-3", "SmolLM2-1.7B 5e-4; OLMo-1B 4e-4; Pythia small ~1e-3"),
+        (2e9, "2e-4 - 1e-3", "SmolLM2-1.7B 5e-4; OLMo-1B 4e-4; EvoLM-1B 2e-4 (config); Pythia small ~1e-3"),
         (15e9, "3e-4", "LLaMA-7B/13B; OLMo-1/2 7B & 13B (config)"),
         (8e10, "1.5e-4 - 6e-4", "LLaMA-33/65B & Llama-2-70B 1.5e-4; OLMo-2-32B 6e-4 (QK-norm stack)"),
         (1e15, "8e-5 - 2.2e-4", "Llama-3-405B 8e-5; DeepSeek-V3 MoE 2.2e-4"),

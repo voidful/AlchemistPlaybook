@@ -16,9 +16,10 @@ report, `[reported]` secondary source.
 10. Multi-domain RLVR, length control, and offline self-distillation
 11. Asynchronous agentic RL and cross-stage distillation (GLM-5)
 12. Turn-level local RL from SFT trajectories (PivotRL)
-13. Multi-teacher on-policy distillation: unifying domain specialists (Agents-A1)
+13. Multi-teacher on-policy distillation: unifying domain specialists (Agents-A1, MiniCPM5)
 14. Synthetic-data curation by feature coverage (FAC / SAE)
 15. When on-policy distillation works: preconditions, mechanism, recovery (Rethinking OPD)
+16. Reasoning-SFT data curation: question quality, answer multiplicity, base-model fit (OpenThoughts / GRAPE)
 
 ## 1. Algorithm chooser
 
@@ -38,6 +39,9 @@ report, `[reported]` secondary source.
 | Sequential RL stages erode earlier capabilities | On-policy cross-stage distillation as the final stage (§11) | GLM-5 recovers SFT/Reasoning-RL/General-RL skills by distilling from each stage's checkpoint as teacher |
 | Have agent SFT trajectories but cannot afford full-trajectory RL; or agent SFT is tanking OOD ability | Turn-level local RL on the same trajectories (PivotRL, §12) | matches E2E-RL accuracy at 4× fewer rollout turns and removes SFT's OOD regression (NVIDIA/Nemotron-3) |
 | Several *domain-specialist agents* must become one model; mixed-domain SFT is regressing IF/general ability | Domain teachers → multi-teacher on-policy distillation (§13) | Agents-A1: OPD repaired the multi-domain-SFT regressions weight merging can't route around |
+| Small model must gain several RL-trained capabilities without forgetting | Parallel capability-specialist RL teachers → OPD back into one student (§13) | MiniCPM5-1B: +16 avg over SFT at 1B, teacher prompts reused as distillation data |
+| Building the SFT *dataset* for a reasoning model | OpenThoughts rules (§16): top 1–2 question sources, LLM difficulty/length filters, ×16 teacher answers, skip answer verification | largest controlled data ablation (1000+ runs); SFT-only result beat RL-trained 7B peers |
+| Same instructions exist with several candidate responses (multiple datasets/teachers) | GRAPE (§16): keep the lowest-base-model-perplexity response, then plain SFT | beats picking the strongest teacher's answers on every base tried |
 | Picking (or debugging) an OPD teacher for a single student | Check the two preconditions first (§15) | Rethinking-OPD: pattern-mismatched or same-pipeline teachers fail even when they benchmark higher — OPD is reverse KL at *student-visited* states, so the teacher must differ there |
 
 ## 2. SFT recipes
@@ -52,6 +56,8 @@ report, `[reported]` secondary source.
 | LFM2 SFT | LFM2 base 0.35–8B | 3e-5 → 1e-7 | decay | — | 3 | per-size (micro 1 + accum) | 32768 | `[paper]` difficulty-curriculum-ordered data; base already distilled |
 | EvoLM SFT | myllama 1B / 4B (after math CPT) | 1e-5 / 7.5e-6 | cosine | ratio 0.1 | 1 (swept 1–32) | 128 | 2048 | `[config]` LLaMA-Factory YAML; full FT + ZeRO-3; math CoT distilled from Qwen2.5-Math-7B-Instruct |
 | Agents-A1 full-domain SFT | Qwen3.5-35B-A3B | 1e-5 | cosine + warmup | ratio 0.05 | 1 | 16 seqs | 131072 | `[paper]` Table 3; wd 0.1, response-token loss only, sample packing; ~100K agent trajectories avg 45K tokens |
+| OpenThinker3-7B (reasoning distillation) | Qwen2.5-7B-Instruct | 8e-5 | cosine | ratio 0.1 | 5 | 512 seqs | not stated | `[config]` HF model card + paper App. D Table 9; AdamW (0.9, **0.999**), wd 0, packing; 1.2M QwQ-32B traces (§16) |
+| GRAPE-curated SFT | Llama3.1-8B / Qwen2.5-7B / Mistral-7B | 1e-5 | — | — | 1 | 256 | — | `[paper]` App. D; batch 256, micro 2; data = lowest-base-model-perplexity responses (§16) |
 
 Rules that matter more than the LR:
 
@@ -80,6 +86,16 @@ Rules that matter more than the LR:
   mistakes and the recovery that follows, learning self-correction without
   ever being trained to reproduce the mistake. Generalizes the prompt-mask
   rule: loss-mask anything you want conditioned on but not imitated.
+- **Scale SFT hyperparameters with dataset size, not just model size.**
+  OpenThoughts' ladder `[paper — App. D Table 9]`, tuned across 1000+
+  reasoning-SFT runs on a 7B: <1K samples → LR 1e-5, batch 32, 13 epochs;
+  1K–3.16K → 2e-5 / 96 / 7; 3.16K–31.6K → 4e-5 / 128 / 5; >31.6K (incl.
+  the 1.2M run) → 8e-5 / 512 / 5 + packing. LR and batch *grow* and epochs
+  *shrink* with dataset size — the many-epoch exception for tiny sets is
+  published precedent, and 8e-5 for large-scale reasoning distillation
+  sits well above the Tulu-3-style 5e-6 chat-SFT default (long fresh CoT
+  traces tolerate it; their runs also kept β₂=0.999 and wd 0). Treat this
+  ladder as the reasoning-distillation regime, not a chat-SFT default.
 - NEFTune (uniform noise on embedding, α=5/10/15) is a cheap sometimes-win
   for chat win-rates `[paper 2310.05914]`; off by default.
 
@@ -255,6 +271,21 @@ RL guardrails: monitor KL to reference, mean reward, and response length
 together — reward↑ + KL↑ + length↑ is the hacking signature. Penalize
 missing EOS (Tulu 3's −10) to prevent run-on generations.
 
+**The length-hacking variant to watch for on reasoning RLVR** (MiniCPM5-1B
+`[paper — OpenBMB/MiniCPM README + figures]`): with an accuracy-only reward
+and a hard generation cap, the model learns to keep generating to the
+max-token budget, "trying" candidate answers until truncation — on the SFT
+checkpoint 42.3% of AIME-2025 and 47.7% of HMMT responses hit max_tokens.
+Their fix combines (1) an **accuracy + length-penalized reward** and (2) a
+**two-stage max-response-length schedule** — train reasoning RL stage 1 at
+30,720 max tokens (with a repetition penalty), then raise to 38,912 for
+stage 2 (accuracy-focused) — rather than starting with the full budget.
+After RL+OPD the overlong rate fell to 9.6% / 7.2% (AIME-2025 / HMMT)
+while accuracy more than doubled (§13). Same lever family as Long2Short's
+λ=0.2 brevity reward (§10) and Tulu 3's EOS penalty: shape length via
+reward and schedule, not truncation alone. Numeric penalty coefficients
+are **not stated**.
+
 ## 6. Post-training failure modes
 
 | Symptom | Likely cause | Fix anchor |
@@ -266,6 +297,7 @@ missing EOS (Tulu 3's −10) to prevent run-on generations.
 | SFT model parrots prompts | loss not masked | mask prompt tokens (Llama 2) |
 | RM score up, humans unimpressed | reward hacking | verifiable rewards, KL watch, fresh on-policy evals |
 | RL run collapses; responses grow until they hit the context window | RL dataset scaled far past saturation | scale RL *epochs*, not dataset size (EvoLM: collapse at 350–400K examples; saturation 4–8 ep / 50–100K) |
+| Reward climbing but a large share of responses hit the max-token cap | accuracy-only reward under a hard cap — length hacking by "trying" answers until truncation | length-penalized reward + staged max-length raise (MiniCPM5 30,720→38,912, §5); Long2Short λ=0.2 (§10) |
 | Multi-domain agent SFT regresses IF / general QA | conflicting reasoning patterns in one SFT mix (single-turn long-thinking vs multi-turn tool-use) | domain teachers + multi-teacher OPD (§13, Agents-A1) |
 | OPD loss falls but student benchmarks flat despite a stronger teacher | teacher fails an OPD precondition: thinking-pattern mismatch, or same-pipeline teacher with nothing new at student-visited states | check top-k overlap ratio + entropy gap; swap teacher, or off-policy cold start + teacher-aligned prompts (§15, Rethinking-OPD) |
 
@@ -519,7 +551,7 @@ When to prefer which (agent post-training):
   with PivotRL-style turn-level training as the cheap middle step
   `[heuristic — no published run combines all three yet]`.
 
-## 13. Multi-teacher on-policy distillation: unifying domain specialists (Agents-A1)
+## 13. Multi-teacher on-policy distillation: unifying domain specialists (Agents-A1, MiniCPM5)
 
 Agents-A1 (Shanghai AI Lab `[paper 2606.30616]`; 35B-A3B MoE initialized
 from Qwen3.5-35B-A3B) is the published recipe for the "several specialists
@@ -576,7 +608,46 @@ teachers* with hard routing. Caveats before citing: the OPD stage's
 LR/batch/top-k are **not stated**; and the paper is internally inconsistent
 in places (the search teacher's GAIA gain appears as both 85.4 and 95.1;
 the reproduced τ²-bench baseline as 32.53/33.0) — quote Table values and
-name the table. For *why* this OPD setup works — and what to check before
+name the table.
+
+**MiniCPM5-1B: the same pattern at 1B, with published gains** `[paper —
+OpenBMB/MiniCPM README + official figures; no dedicated arXiv report
+exists]`. The full post-training pipeline of a 1B on-device model
+(released 2026-05): 200B tokens deep-thinking SFT + 200B hybrid-thinking
+SFT → **parallel RL teachers** branched off the SFT checkpoint —
+Reasoning RL stage 1 (repetition penalty) → stage 2 (reasoning accuracy)
+plus RLHF (human preference), IF RL, General RL, and Long-Context RL —
+→ **on-policy distillation of all teachers back into one student**.
+Deviations from Agents-A1 worth knowing:
+
+- The teachers are not domain-specialist *agents* but capability-specialist
+  RL runs of the same 1B; OPD still repairs the unification problem.
+- **OPD is run inside the RL framework**: reverse KL to the teacher is used
+  *as the advantage estimate*, replacing the verifier-based advantage —
+  operationally GLM-5's §11 trick (Â = teacher/student log-prob gap)
+  adopted wholesale. Implementation follows the TML blog + Rethinking-OPD
+  (§15), with one variant choice made explicit: top-k logits are taken from
+  **both** student and teacher and the reverse KL is computed on the
+  **union** of the two token sets (Rethinking-OPD's default analyzes
+  student-top-k; union is an implemented option in its repo) `[paper —
+  README verbatim]`.
+- **Prompt reuse**: OPD reuses each RL teacher's in-domain training prompts
+  as the distillation data — "no additional data curation is required"
+  `[paper]`. The cheapest published answer to "what do I distill on".
+- Reasoning RL data/recipe: DAPO-Math-17k prompts, "inspired by JustRL's
+  minimalist recipe" (arXiv 2512.16649), plus TriviaQA / NQ-Open /
+  LongWriter-Zero-RLData / synthesized verifiable RLVR / pairwise RLHF
+  signals `[paper]`. Length control is handled in-RL — see §5 guardrails.
+
+Published effect of RL+OPD over the SFT checkpoint `[paper — official
+figures]`: average +16 points with overlong responses (hitting the
+max-token budget) down 29 pp; per-benchmark AIME-2025 17.3→40.4,
+AIME-2026 15.6→40.4, HMMT-Feb-26 11.9→25.8, LCB-v6 20.6→33.5, IFEval
+68.2→80.4, IFBench 33.7→46.7, Multi-IF 28.5→43.5. Final model averages
+42.57 vs Qwen3-0.6B 26.77 / Qwen3.5-0.8B 25.14 / LFM2.5-1.2B 35.61
+`[paper — eval table]`. Not stated anywhere: OPD top-k value, the RL
+algorithm base and KL/clip coefficients, all LRs/batch sizes, teacher
+checkpoint selection — **do not invent them**. For *why* this OPD setup works — and what to check before
 copying it with a different teacher — see §15: Agents-A1's teachers are
 branched from the student's own SFT checkpoint (thinking-pattern match by
 construction) and carry RL-gained capability the student lacks, i.e. both
@@ -714,3 +785,83 @@ Honesty caveat: the paper reports results almost entirely in figures — no
 consolidated numeric results table — so benchmark deltas above are
 `[paper — figure-read]`; cite the mechanism numbers (97–99% mass,
 72→91% overlap) and the config table, which are stated in text.
+
+## 16. Reasoning-SFT data curation: question quality, answer multiplicity, base-model fit (OpenThoughts / GRAPE)
+
+Two sources turn "data beats hyperparameters" into concrete SFT-dataset
+rules. OpenThoughts (arXiv 2506.04178, ICLR 2026) is the largest published
+controlled ablation of reasoning-SFT data curation — 1000+ runs at 31.6K
+datapoints each, culminating in OpenThoughts3-1.2M and OpenThinker3-7B.
+GRAPE (arXiv 2502.04194, NeurIPS 2025) supplies the response-*selection*
+rule when several candidate answers exist per instruction.
+
+**OpenThoughts' five findings** `[paper]` (each from controlled ablations):
+
+1. **Sample many answers per question from the teacher** — "an effective
+   technique to increase the size of a data source by at least 16×"; the
+   final recipe annotates every question 16× with QwQ-32B. Scaling answers
+   per question ≈ free data, and it is the SFT-data mirror of SSP's
+   diversity goal (§9).
+2. **Better benchmark scores ≠ better teacher.** QwQ-32B-taught students
+   beat DeepSeek-R1-taught students by +2.6 (math) / +1.9 (code) even
+   though R1 outscores QwQ-32B by 8–23 points on the same benchmarks.
+   Convergent with GRAPE below and FAC's backbone-aligned-generator result
+   (§14): *fit* beats generator strength.
+3. **Answer verification/filtering did not help**: "the no-filtering
+   strategy … led to performance similar to that of all other methods of
+   filtering" (including LLM verification and majority consensus); the
+   shipped pipeline applies **no answer filtering**. Don't spend teacher
+   compute verifying answers — spend it sampling more of them (finding 1).
+4. **Fewer, better question sources.** Selecting questions from the top
+   1–2 sources per domain beat mixing the top 4/8/16 — optimizing source
+   *diversity* actively hurt.
+5. **LLM-based question filters beat classical ones**: LLM-labeled
+   difficulty (used for code) and LLM response-length (math/science)
+   outperformed embedding/fastText filters. Question difficulty filtering
+   *does* pay — contrast with finding 3: filter *questions*, not answers.
+
+Pipeline `[config — dataset card]`: filter → dedup → downsample to 75K
+questions → ×16 QwQ-32B annotation → 1.2M (850K math / 250K code / 100K
+science). Headline result `[paper — Table 1]`: **SFT-only** OpenThinker3-7B
+averages 55.3 vs RL-trained AceReason-7B 52.9, Skywork-7B 51.6, and
+SFT+RL Nemotron-Nano-8B 53.2 — at 7B, data curation alone beat RL
+pipelines (not a controlled SFT-vs-RL comparison — different bases and
+data — but the strongest open-data 7B was pure SFT; cf. §12/§15 for when
+RL earns its keep). Hyperparameters: §2 table row and the dataset-size
+ladder bullet. The 1.5B sibling used LR 1.6e-4 / batch 256 / 7 epochs
+`[config]` — don't mix the recipes.
+
+**GRAPE: pick the response that fits the base model** `[paper 2502.04194;
+cite arXiv v3 for the metric]`. For each instruction with multiple
+candidate responses (from existing datasets and/or several teachers), score
+each candidate's **length-normalized conditional log-probability under the
+base model you are about to fine-tune** (= lowest perplexity), keep the
+best, then run completely standard SFT. Selection is forward-pass-only —
+no gradients, no reward model.
+
+- Controlled setting `[paper — Table 1]`, UltraInteract, size-matched:
+  Llama3.1-8B avg 41.5 vs 36.8 (original data) / 38.8 (Llama3.1-405B-
+  generated) / 31.7 (3× data); Qwen2.5-7B 56.7 vs 45.1 / 42.9 / 39.4.
+  The 405B-generated baseline losing to base-model-fit selection is the
+  cleanest published "stronger generator ≠ better data" evidence.
+- Realistic setting `[paper — Table 2]`, pool = Tulu-3 + Olmo-2
+  post-training data: GRAPE-350K @1 epoch averages 35.9 vs Tulu3-SFT-939K
+  @2 epochs 32.4 (~1/6 the compute), and beats S2L/LESS/embedding
+  selection baselines on every base tried.
+- **Reverse-GRAPE control**: selecting the *highest*-perplexity responses
+  hurts (30.8) — the effect is direction-specific, not a data-size
+  artifact.
+- Extends to reasoning traces `[paper — App. B]`: lowest-perplexity
+  correct R1-distill trajectories beat highest-perplexity ones.
+- Caveats: the metric is explicitly **length-normalized** (v1/v2 said only
+  "conditional probability" — cite v3); do not attribute the S2L
+  baseline's scheduler details to GRAPE; scoring used a plain
+  "Question:/Answer:" template with no chat-template ablation.
+
+**How they compose** `[heuristic]`: OpenThoughts curates *questions* and
+says don't filter answers for a *single* teacher; GRAPE ranks *answers*
+when you have several candidates per instruction; FAC (§14) measures
+whether the resulting set covers the task's feature space. Hard questions
+(finding 5, VibeThinker's ≥0.75-error filter, MGPO's p₀=0.5) + many/long
+diverse answers (finding 1, §9) + base-model-likelihood selection (GRAPE)
+is the assembled playbook for a reasoning-SFT dataset.

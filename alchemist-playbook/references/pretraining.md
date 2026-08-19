@@ -124,6 +124,22 @@ homogeneous phase.
   at the target length), and long-context gains tracked data *diversity*
   (NextLong/EntropyLong-style synthetic long-range dependencies + MRCR-like
   multi-turn recall data at the 200K stage).
+- **MiniCPM5-1B** `[paper — OpenBMB/MiniCPM README + official recipe
+  figure; no dedicated arXiv report — do not cite the MiniCPM4 paper
+  (2506.07900) for it]`: the WSD lineage (MiniCPM, §2) grown into a
+  staged decay curriculum that folds the long-context extension *into the
+  decay phases*: stable training → **short decay @4K ctx (200B tokens) →
+  long decay @32K (75B) → long decay @128K (25B)** → base checkpoint →
+  mid-training (200B) → 200B deep-thinking SFT + 200B hybrid-thinking SFT.
+  Data: Ultra-FineWeb / Ultra-FineWeb-L3 / UltraData-Math under the
+  "UltraData tiered data management" scheme (arXiv 2602.09003). Stable-
+  phase token count, optimizer, and all LRs are **not stated**.
+  Architecture `[config — HF config.json]`: 1.08B total / 0.68B
+  non-embedding, 24 layers, GQA 16/2 heads, vocab 130,560, rope_theta 5e6,
+  ctx 131,072. Result context: averages 42.57 vs Qwen3-0.6B 26.77 /
+  LFM2.5-1.2B 35.61 — the strongest published ≤1B recipe as of mid-2026;
+  its RL+OPD post-training is the other half of the story
+  (post-training.md §13).
 
 - **EvoLM (the controlled CPT data point)** `[config/paper 2506.16029]`:
   CPT re-warms the LR to the **full pretraining peak** (2e-4, warmup ratio
@@ -176,7 +192,9 @@ examples** by measured difficulty is a separate, composable lever — see §6.
 
 Below ~3B, two levers from the 2025 small-model playbook (LFM2; consistent
 with Gemma 2/3, MiniCPM, SmolLM3, Llama 3.2 1B/3B) move the needle more than
-any optimizer tweak. If the user is training a sub-3B model and a strong
+any optimizer tweak. For the post-training half of the current-best ≤1B
+pipeline (parallel RL teachers + OPD, MiniCPM5-1B), see post-training.md
+§13; its staged-decay pretraining curriculum is in §4 above. If the user is training a sub-3B model and a strong
 same-family teacher exists, **distillation is usually the single highest-
 leverage change available** — recommend it before debating LR.
 

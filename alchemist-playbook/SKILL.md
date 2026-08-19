@@ -2,20 +2,21 @@
 name: alchemist-playbook
 description: >-
   Evidence-based training-recipe advisor (煉丹調參) distilled from published
-  runs: LLaMA 1-3, OLMo 1-3, DeepSeek-V3, SmolLM2, Kimi K2, GLM-5, PivotRL,
-  Agents-A1, OPD, EvoLM, LFM2, VibeThinker, FAC-Synthesis, Zephyr, Tulu 3, SimPO,
-  ORPO, QLoRA, Whisper, OWSM, wav2vec 2.0, HuBERT. Use whenever the user asks
-  about training hyperparameters (learning rate, batch size, warmup,
-  scheduler, optimizer, beta, weight decay, epochs), debugging a training run
-  (loss spike, NaN, divergence, slow convergence, overfitting), designing a
+  runs: LLaMA 1-3, OLMo 1-3, DeepSeek-V3, SmolLM2, MiniCPM5, Kimi K2, GLM-5,
+  PivotRL, Agents-A1, OPD, EvoLM, LFM2, VibeThinker, OpenThoughts, GRAPE,
+  FAC-Synthesis, Zephyr, Tulu 3, SimPO, ORPO, QLoRA, Whisper, OWSM, wav2vec
+  2.0, HuBERT. Use whenever the user asks about training hyperparameters
+  (learning rate, batch size, warmup, scheduler, optimizer, beta, weight
+  decay, epochs), debugging a training run (loss spike, NaN, divergence,
+  overfitting), designing a
   pretraining/SFT/DPO/RLHF/RLVR/agentic-RL/LoRA/QLoRA/speech (ASR/TTS)
-  recipe, compute or token budgets, distillation/curriculum/model-merging
-  strategy, small or on-device models, what to monitor or which
-  benchmarks/eval suite per stage, capability regression or catastrophic
-  forgetting, tracking/reporting training runs (實驗追蹤, HTML run reports),
-  or mentions 煉丹, 調參, "training recipe", "fine-tuning settings", "what LR
-  should I use", "eval suite", "release gate" — even if they never say
-  "hyperparameter".
+  recipe, compute or token budgets, SFT data curation,
+  distillation/curriculum/merging, on-device models, what to
+  monitor or which benchmarks/eval suite per stage, capability
+  regression/forgetting, tracking/reporting training runs (實驗追蹤, HTML
+  run reports), or mentions 煉丹, 調參, "training recipe", "fine-tuning
+  settings", "what LR should I use", "eval suite", "release gate" — even if
+  they never say "hyperparameter".
 ---
 
 # Alchemist Playbook
@@ -144,7 +145,11 @@ decoder under latency/memory budgets (LFM2). See `references/pretraining.md` §6
 For a small **reasoning** model specifically, the diversity-first SFT →
 signal-amplifying RL recipe (SSP + MGPO, with the SFT checkpoint selected by
 Pass@K) and CLR test-time scaling are the levers (VibeThinker;
-`references/post-training.md` §9–10).
+`references/post-training.md` §9–10). The strongest published ≤1B pipeline
+is MiniCPM5-1B: staged-decay pretrain (pretraining.md §4) → parallel RL
+teachers → on-policy distillation (post-training.md §13). When *building*
+a reasoning-SFT dataset, follow the OpenThoughts/GRAPE curation rules
+(post-training.md §16).
 
 ## Cross-stage LR ladder (~8B dense example)
 
