@@ -18,6 +18,7 @@ report, `[reported]` secondary source.
 12. Turn-level local RL from SFT trajectories (PivotRL)
 13. Multi-teacher on-policy distillation: unifying domain specialists (Agents-A1)
 14. Synthetic-data curation by feature coverage (FAC / SAE)
+15. When on-policy distillation works: preconditions, mechanism, recovery (Rethinking OPD)
 
 ## 1. Algorithm chooser
 
@@ -37,6 +38,7 @@ report, `[reported]` secondary source.
 | Sequential RL stages erode earlier capabilities | On-policy cross-stage distillation as the final stage (§11) | GLM-5 recovers SFT/Reasoning-RL/General-RL skills by distilling from each stage's checkpoint as teacher |
 | Have agent SFT trajectories but cannot afford full-trajectory RL; or agent SFT is tanking OOD ability | Turn-level local RL on the same trajectories (PivotRL, §12) | matches E2E-RL accuracy at 4× fewer rollout turns and removes SFT's OOD regression (NVIDIA/Nemotron-3) |
 | Several *domain-specialist agents* must become one model; mixed-domain SFT is regressing IF/general ability | Domain teachers → multi-teacher on-policy distillation (§13) | Agents-A1: OPD repaired the multi-domain-SFT regressions weight merging can't route around |
+| Picking (or debugging) an OPD teacher for a single student | Check the two preconditions first (§15) | Rethinking-OPD: pattern-mismatched or same-pipeline teachers fail even when they benchmark higher — OPD is reverse KL at *student-visited* states, so the teacher must differ there |
 
 ## 2. SFT recipes
 
@@ -265,6 +267,7 @@ missing EOS (Tulu 3's −10) to prevent run-on generations.
 | RM score up, humans unimpressed | reward hacking | verifiable rewards, KL watch, fresh on-policy evals |
 | RL run collapses; responses grow until they hit the context window | RL dataset scaled far past saturation | scale RL *epochs*, not dataset size (EvoLM: collapse at 350–400K examples; saturation 4–8 ep / 50–100K) |
 | Multi-domain agent SFT regresses IF / general QA | conflicting reasoning patterns in one SFT mix (single-turn long-thinking vs multi-turn tool-use) | domain teachers + multi-teacher OPD (§13, Agents-A1) |
+| OPD loss falls but student benchmarks flat despite a stronger teacher | teacher fails an OPD precondition: thinking-pattern mismatch, or same-pipeline teacher with nothing new at student-visited states | check top-k overlap ratio + entropy gap; swap teacher, or off-policy cold start + teacher-aligned prompts (§15, Rethinking-OPD) |
 
 ## 7. Evaluation discipline
 
@@ -573,7 +576,11 @@ teachers* with hard routing. Caveats before citing: the OPD stage's
 LR/batch/top-k are **not stated**; and the paper is internally inconsistent
 in places (the search teacher's GAIA gain appears as both 85.4 and 95.1;
 the reproduced τ²-bench baseline as 32.53/33.0) — quote Table values and
-name the table.
+name the table. For *why* this OPD setup works — and what to check before
+copying it with a different teacher — see §15: Agents-A1's teachers are
+branched from the student's own SFT checkpoint (thinking-pattern match by
+construction) and carry RL-gained capability the student lacks, i.e. both
+Rethinking-OPD preconditions hold by design.
 
 ## 14. Synthetic-data curation by feature coverage (FAC / SAE)
 
@@ -621,3 +628,89 @@ coverage in the *model's own feature space*, not surface variety.**
   annealed 200→20, default 5 epochs) and the toxicity fine-tune script is
   not runnable as published — treat repo numbers as `[config]` *with that
   flag*, and the paper's Table values as the citable ones.
+
+## 15. When on-policy distillation works: preconditions, mechanism, recovery (Rethinking OPD)
+
+"Rethinking On-Policy Distillation" (THUNLP `[paper 2604.13016 +
+thunlp/OPD repo, verl 0.7.0]`) is the controlled study of *single-teacher*
+OPD — the science underneath GLM-5's cross-stage distillation (§11) and
+Agents-A1's multi-teacher stage (§13). Setup: math reasoning
+(DAPO-Math-17K prompts; AIME24/25, AMC23 avg@16), students
+R1-Distill-1.5B and Qwen3-1.7B(-Base), teachers JustRL-1.5B,
+R1-Distill-7B, and Qwen3-4B variants. The loss is per-token **reverse KL
+from the teacher at student-visited states**, truncated to the student's
+top-k support and renormalized on it (Student Top-K) `[paper §2.2]`.
+
+**Two preconditions — check both before spending the compute:**
+
+1. **Thinking-pattern consistency.** A GRPO-trained Qwen3-4B teacher with
+   a *lower* benchmark score outproduced a stronger non-thinking Qwen3-4B:
+   it started at higher top-k overlap with the student (~72%) and the
+   mismatched teacher's deficit was never recovered later in training
+   `[paper — figure-read]`. Teacher benchmark score is the wrong selection
+   criterion; pattern compatibility at student-visited states is the right
+   one.
+2. **Genuinely new capability.** Same-pipeline teachers fail even when
+   bigger: distilling R1-Distill-1.5B toward R1-Distill-7B stagnated on
+   every metric, and reverse-distillation showed why — a same-family 7B
+   teacher and a 1.5B pre-RL checkpoint induced *nearly indistinguishable*
+   target distributions on the student's own trajectories (JustRL-1.5B
+   pushed toward its pre-RL checkpoint regressed almost exactly to pre-RL
+   performance) `[paper]`. What works: a teacher that gained capability
+   the student's pipeline never saw — e.g. via its own RL.
+
+Global reward quality does NOT substitute for these: the *failing* 7B
+teacher separated correct from incorrect rollouts as well as the
+succeeding one (AUROC 0.75 vs 0.73) `[paper — Fig. 14]`. A teacher can be
+a fine judge and a useless token-level supervisor.
+
+**Mechanism → the monitoring signals.** Successful OPD is progressive
+alignment on a small shared high-probability token set: the student–teacher
+top-k **overlap ratio** rises (~72% → ~91%), the overlap tokens carry
+**97–99% of both models' probability mass** throughout, and the entropy
+gap |H(teacher) − H(student)| narrows toward zero. In failing runs all
+three curves are **flat from the outset** `[paper — Fig. 6, figure-read]`.
+Optimizing *only* the overlap tokens matches full Student Top-K; the
+non-overlap tokens contribute little `[paper — Fig. 7]`. So: log overlap
+ratio + entropy gap from step 0 (same diagnostic family as Agents-A1's
+"student mass on teacher top-k", §13). Flat curves in the first hundreds
+of steps → stop the run; a precondition is violated — more steps will not
+fix it.
+
+**Recovery recipes when a precondition fails:**
+
+- **Off-policy cold start** — SFT the student on teacher-generated
+  responses first (they used 200K teacher responses on an OpenThoughts3
+  math subset), then run OPD on held-out prompts (~30K after dedup).
+  Overlap starts higher and stays smooth; the cold-started student
+  substantially beats pure OPD `[paper — Fig. 8, figure-read]`. This is
+  the published rationale for the SFT-before-OPD ordering that GLM-5 and
+  Agents-A1 both use implicitly.
+- **Teacher-aligned prompts and template** — switching the student to the
+  teacher's answer template alone improved all three benchmarks; drawing
+  prompts from the teacher's own post-training distribution helps too but
+  **collapses student entropy** — mix teacher-aligned prompts with prompts
+  outside the teacher's training data `[paper — Fig. 9–10, figure-read]`.
+
+**Knob guidance** (default config `[paper — Table 2]`, repo-confirmed
+values marked): lr 1e-6, global batch 64, rollouts/prompt 4 `[config]`,
+Student Top-K k=16 `[config]`, max prompt 1,024 / max response 7,168
+`[config]`, temp 1.0, 1 epoch, 8×A800-80G; eval avg@16 at temp 0.7,
+top-p 0.95, val max len 31,744.
+
+- **k is insensitive above ~4**: top-1 consistently underperforms; top-4
+  through top-16 are similar; even sampled-token-only supervision is
+  comparable `[paper — Fig. 15]`. Don't sweep k; spend the effort on
+  teacher choice.
+- **Response-length sweet spot 3K–7K** for this regime: 0.5–1K gives too
+  little supervision, 10–15K plateaus or declines `[paper — Fig. 11a]`.
+- **The teacher's per-token advantage decays with prefix length**: +0.37
+  at 1K-token prefixes → +0.02 at 16K `[paper — Fig. 11b]`. Dense
+  token-level supervision fades on long sequences — an open caveat for
+  long-horizon agent OPD (Agents-A1 distills at 131K seq; whether the
+  signal survives there is untested `[heuristic]`).
+
+Honesty caveat: the paper reports results almost entirely in figures — no
+consolidated numeric results table — so benchmark deltas above are
+`[paper — figure-read]`; cite the mechanism numbers (97–99% mass,
+72→91% overlap) and the config table, which are stated in text.
