@@ -49,6 +49,7 @@ links back (invariant 4).
 | [0002](decisions/0002-three-tier-evaluation-framework.md) | Three-tier per-stage evaluation framework (monitoring ≠ evaluation ≠ release gate) | active |
 | [0003](decisions/0003-html-artifact-experiment-tracking.md) | Experiment tracking = HTML artifacts + git commits + GitHub Pages | active |
 | [0004](decisions/0004-two-road-documentation.md) | Two-road documentation: interactive HTML for humans, indexed markdown for agents | active |
+| [0005](decisions/0005-plugin-packaging-tests-ci.md) | Plugin packaging (Claude Code + Codex manifests), MIT license, versioned releases, test suite, CI | active |
 
 ## Knowledge homes outside `docs/`
 
@@ -66,11 +67,21 @@ place each — never duplicate these facts into `docs/`:
 
 ## Validation
 
-Run the deterministic doc checker before committing structural changes:
+Run the deterministic doc checker and the test suite before committing
+structural changes:
 
 ```bash
 python3 scripts/check_docs.py
 ```
 
-It enforces the indexing, routing-sync, and packaging invariants listed in
-[constitution.md](constitution.md).
+```bash
+python3 -m unittest discover -s tests
+```
+
+The checker enforces the indexing, routing-sync, and packaging invariants
+listed in [constitution.md](constitution.md). The tests cover `estimate.py`
+math, template validity, the SKILL.md ↔ `estimate.py` LR lock, §-citation
+integrity, and version sync. CI (`.github/workflows/ci.yml`) runs both on
+every push. User-visible changes are recorded in
+[CHANGELOG.md](../CHANGELOG.md); the release version lives in the plugin
+manifests (see [decision 0005](decisions/0005-plugin-packaging-tests-ci.md)).

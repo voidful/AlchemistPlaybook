@@ -276,14 +276,14 @@
 // DATA — the only block to edit when facts change (docs/conventions.md).
 // ============================================================================
 const DATA = {
-  updated: "2026-08-19",
+  updated: "2026-08-20",
   repo: "https://github.com/voidful/AlchemistPlaybook",
   stats: [
     { v: "auto:sources", k: "sources in the bibliography" },
     { v: "10", k: "routed reference files" },
     { v: "8",  k: "ready-to-edit config templates" },
     { v: "15/15", k: "eval expectations passed (11/15 without the skill)", up: "+4" },
-    { v: "4",  k: "decision records" },
+    { v: "5",  k: "decision records" },
     { v: "≤1024", k: "hard cap on trigger description (chars)" }
   ],
   routing: [
@@ -392,6 +392,7 @@ const DATA = {
     { n: "OpenThoughts / OpenThinker3", id: "2506.04178", a: "Post-training", v: "config", u: "1000+-run SFT data ablation: ×16 answers/question, no answer filtering, top-1-2 sources; SFT-only 7B beats RL peers" },
     { n: "GRAPE", id: "2502.04194", a: "Post-training", v: "paper", u: "Pick lowest base-model-perplexity response per instruction, then plain SFT; beats 405B-generated data" },
     { n: "On-Policy Distillation (TML)", id: "thinkingmachines.ai", a: "Post-training", v: "reported", u: "Dense per-token reverse-KL reward; ~7-10× fewer steps than RL; anti-forgetting self-teacher", link: "https://thinkingmachines.ai/blog/on-policy-distillation/" },
+    { n: "SEED", id: "2607.14777", a: "Post-training", v: "config", u: "Self-evolving OPD for agentic RL: policy analyzes its own trajectories into hindsight skills, gated self-distillation joint with GRPO; no teacher, no inference-time skill bank" },
     { n: "Whisper", id: "2212.04356", a: "Speech", v: "paper", u: "Per-size LRs (1.5e-3→1.75e-4), β₂ 0.98, ε 1e-6, warmup 2048" },
     { n: "OWSM v3.1", id: "2401.16658", a: "Speech", v: "config", u: "Piecewise warmup 60K, peak 2e-4 (medium), CTC 0.3" },
     { n: "OWSM v4", id: "2506.00338", a: "Speech", v: "paper", u: "CTC-segmentation realign → filter 370K→166K h; data-first lesson" },
@@ -422,7 +423,8 @@ const DATA = {
     { id: "0001", d: "2026-06-12", t: "Evidence-based routing skill", p: "Every value traces to a source or is labeled heuristic; thin SKILL.md + routed reference files; fixed Diagnosis/Recipe/Evidence/Verify format.", f: "0001-evidence-based-routing-skill.md" },
     { id: "0002", d: "2026-06-15", t: "Three-tier evaluation framework", p: "Health monitoring ≠ capability evaluation ≠ release gate; retention suite for mid-training.", f: "0002-three-tier-evaluation-framework.md" },
     { id: "0003", d: "2026-07-11", t: "HTML-artifact experiment tracking", p: "Every experiment change gets a self-contained HTML artifact, a commit, and a Pages URL — the commit log is the ablation log.", f: "0003-html-artifact-experiment-tracking.md" },
-    { id: "0004", d: "2026-08-19", t: "Two-road documentation", p: "Interactive HTML for humans (this page), indexed markdown for agents; six governance invariants; deterministic checker.", f: "0004-two-road-documentation.md" }
+    { id: "0004", d: "2026-08-19", t: "Two-road documentation", p: "Interactive HTML for humans (this page), indexed markdown for agents; six governance invariants; deterministic checker.", f: "0004-two-road-documentation.md" },
+    { id: "0005", d: "2026-08-19", t: "Plugin packaging, versioned releases, tests, CI", p: "One-command Claude Code install (plugin manifests, no directory move), MIT license, CHANGELOG + version sync, stdlib test suite locking SKILL.md to estimate.py, GitHub Actions CI.", f: "0005-plugin-packaging-tests-ci.md" }
   ],
   commits: [
     { d: "2026-08-19", s: "Add MiniCPM5-1B, OpenThoughts, GRAPE: reasoning-SFT data curation, RL length-control guardrail, 1B RL-teachers→OPD" },

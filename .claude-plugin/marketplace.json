@@ -1,0 +1,17 @@
+{
+  "name": "alchemist-playbook",
+  "owner": {
+    "name": "voidful"
+  },
+  "plugins": [
+    {
+      "name": "alchemist-playbook",
+      "source": "./",
+      "description": "煉丹調參顧問——從公開訓練紀錄（LLaMA/OLMo/DeepSeek-V3/SmolLM2/Kimi K2/Tulu 3/Zephyr/QLoRA/Whisper/OWSM…）蒸餾出的實證訓練配方 skill：超參數建議、訓練崩壞除錯、pretrain/SFT/DPO/RLHF/RLVR/LoRA/語音配方設計、算力與 token 預算、逐階段評測套件與 release gate、HTML 實驗追蹤。每個數字都帶 [config]/[paper]/[reported] 出處標記。",
+      "category": "Education & Research",
+      "author": {
+        "name": "voidful"
+      }
+    }
+  ]
+}

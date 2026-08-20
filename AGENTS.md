@@ -26,11 +26,20 @@ change must preserve.
 - SKILL.md `description:` ≤ **1024 characters**.
 - After any change under `alchemist-playbook/`, repackage the archive
   ([workflow](docs/workflows/release.md)).
-- Before committing structural changes, run:
+- Before committing structural changes, run the checker and the tests:
 
 ```bash
 python3 scripts/check_docs.py
 ```
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+- User-visible change → entry in `CHANGELOG.md` and matching `version` bump
+  in `.claude-plugin/plugin.json` + `.codex-plugin/plugin.json`
+  ([decision 0005](docs/decisions/0005-plugin-packaging-tests-ci.md);
+  equality is enforced by `tests/test_doc_consistency.py`).
 
 - When headline facts change (sources, evals, decisions, routing), update
   the `DATA` block at the top of [`docs/index.html`](docs/index.html) — and

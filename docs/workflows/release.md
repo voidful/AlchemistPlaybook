@@ -20,8 +20,13 @@ invariant 1 — docs-first).
 python3 scripts/check_docs.py
 ```
 
-   This includes the ≤ 1024-char description check and archive-freshness
-   check.
+```bash
+python3 -m unittest discover -s tests
+```
+
+   `check_docs.py` includes the ≤ 1024-char description check and the
+   archive-freshness check; the tests lock SKILL.md to `estimate.py` and
+   validate the templates.
 
 2. Rebuild the archive from the repo root (exclude Python bytecode):
 
@@ -40,10 +45,14 @@ unzip -l alchemist-playbook.skill
    `docs/`.
 
 4. Commit the archive together with the source change that motivated it —
-   one commit, one logical change.
+   one commit, one logical change. If the change is user-visible, add a
+   `CHANGELOG.md` entry and bump `version` in **both**
+   `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` in the same
+   commit (`tests/test_doc_consistency.py` enforces that they match).
 
 ## What is deliberately NOT packaged
 
 `alchemist-playbook-workspace/` (eval harness output), `docs/` (repo
-documentation), `AGENTS.md`, `README.md`, `scripts/check_docs.py`. The
-archive is the skill only.
+documentation), `AGENTS.md`, `README.md`, `CHANGELOG.md`, `LICENSE`,
+`scripts/check_docs.py`, `tests/`, the plugin manifests, and
+`.github/`. The archive is the skill only.
