@@ -20,6 +20,7 @@ report, `[reported]` secondary source.
 14. Synthetic-data curation by feature coverage (FAC / SAE)
 15. When on-policy distillation works: preconditions, mechanism, recovery (Rethinking OPD)
 16. Reasoning-SFT data curation: question quality, answer multiplicity, base-model fit (OpenThoughts / GRAPE)
+17. Self-evolving hindsight-skill distillation for agentic RL (SEED)
 
 ## 1. Algorithm chooser
 
@@ -43,6 +44,7 @@ report, `[reported]` secondary source.
 | Building the SFT *dataset* for a reasoning model | OpenThoughts rules (§16): top 1–2 question sources, LLM difficulty/length filters, ×16 teacher answers, skip answer verification | largest controlled data ablation (1000+ runs); SFT-only result beat RL-trained 7B peers |
 | Same instructions exist with several candidate responses (multiple datasets/teachers) | GRAPE (§16): keep the lowest-base-model-perplexity response, then plain SFT | beats picking the strongest teacher's answers on every base tried |
 | Picking (or debugging) an OPD teacher for a single student | Check the two preconditions first (§15) | Rethinking-OPD: pattern-mismatched or same-pipeline teachers fail even when they benchmark higher — OPD is reverse KL at *student-visited* states, so the teacher must differ there |
+| Agentic RL where sparse episode rewards leave intermediate decisions unguided, and no stronger teacher exists | Self-evolving hindsight-skill OPD joint with GRPO (SEED, §17) | dense token-level signal from the policy's *own* trajectory analysis; beats GRPO on ALFWorld/WebShop/search-QA at 1.7–7B |
 
 ## 2. SFT recipes
 
@@ -604,7 +606,9 @@ Position it among the unification tools: §8 merges *weights* (needs a
 shared ancestor; can silently trade capabilities), §10 distills *offline*
 from verified trajectories, GLM-5 (§11) distills on-policy from its own
 *earlier stages*; Agents-A1 distills on-policy from *parallel domain
-teachers* with hard routing. Caveats before citing: the OPD stage's
+teachers* with hard routing; SEED (§17) removes the separate teacher
+entirely — the policy supervises itself from a hindsight-skill-augmented
+context. Caveats before citing: the OPD stage's
 LR/batch/top-k are **not stated**; and the paper is internally inconsistent
 in places (the search teacher's GAIA gain appears as both 85.4 and 95.1;
 the reproduced τ²-bench baseline as 32.53/33.0) — quote Table values and
@@ -869,3 +873,74 @@ whether the resulting set covers the task's feature space. Hard questions
 (finding 5, VibeThinker's ≥0.75-error filter, MGPO's p₀=0.5) + many/long
 diverse answers (finding 1, §9) + base-model-likelihood selection (GRAPE)
 is the assembled playbook for a reasoning-SFT dataset.
+
+## 17. Self-evolving hindsight-skill distillation for agentic RL (SEED)
+
+SEED (Tsinghua `[paper 2607.14777 v1, 2026-07-16 preprint + jinyangwu/Seed
+repo, verl-based]`) attacks the core agentic-RL problem — sparse
+trajectory-level rewards give no guidance on *intermediate* decisions —
+without any external teacher: the policy analyzes its **own completed
+trajectories** into natural-language "hindsight skills" and distills the
+skill-induced probability shift back into itself as a dense token-level
+signal. It is the fourth teacher construction in the OPD family: §11
+distills from earlier-stage checkpoints, §13 from parallel specialist
+teachers, §15 studies a single external teacher; SEED's teacher is **the
+same policy given privileged hindsight context**. Both Rethinking-OPD
+preconditions (§15) hold trivially — perfect pattern match (same model)
+and genuinely new information (the skill summarizes the episode outcome
+the acting policy could not see).
+
+**Two stages** `[paper]`:
+
+1. **Hindsight-skill SFT.** Collect 1,440 trajectories (180 tasks × 8
+   rollouts), annotate each completed trajectory with an episode-level
+   hindsight skill using an external analyzer (GLM-5.2; the repo also
+   ships Gemini-annotated variants for some envs), and SFT 3 epochs — so
+   one backbone can both act and analyze. Ablation: dropping this stage
+   costs −5.8 on ALFWorld (91.8→86.0) `[paper — ablation table]`.
+2. **Self-evolving OPD inside GRPO.** Each update, the frozen current
+   policy π_old both samples rollouts *and* serves as the analyzer
+   (repo: `analysis_backend=policy_vllm` `[config]`), extracting
+   episode-level + critical-step skills from its own trajectories. The
+   *same sampled action tokens* are re-scored under the ordinary context h
+   and the skill-augmented context h̃; the shift Δ = sg[log π(a|h̃) −
+   log π(a|h)] passes through a sigmoid gate g = σ(β_opd·Δ), which weights
+   a distillation loss added to the RL loss: **L = L_rl + λ_opd·L_opd**.
+   After the update the improved policy becomes the next analyzer —
+   supervision evolves with the policy. Replacing this with a *static*
+   offline skill bank costs −7.4 (84.4); removing the OPD term costs −4.8
+   (87.0) — the self-evolution is worth more than either component alone
+   `[paper — ablation table]`.
+
+**Knobs** (repo `examples/seed_trainer/_common/*.sh` defaults `[config]`
+unless marked): **λ_opd = 0.01, gate β_opd = 5.0** — neither value appears
+in the paper text, so cite them as repo defaults; actor lr 1e-6 (the §5
+GRPO convention), KL loss coef 0.01 (ALFWorld) / 0.001 (search),
+`low_var_kl`, no KL-in-reward; group size G=8, train batch 16 (ALFWorld;
+paper says 128 for search-QA `[paper]`), γ=0.95, invalid-action penalty
+0.1; per-step max prompt 2,048 / response 512; analyzer context 16,384,
+max completion 4,096, ≤5 step-skills per trajectory (ALFWorld) / ≤2
+(search); rollout temp 1.0, val temp 0.4; ~150 policy updates `[paper]`
+(script default 160 epochs — repo/paper divergence, cite the paper).
+
+**Results** `[paper — Table 1]` (bases Qwen2.5-3B/7B-Instruct,
+Qwen3-1.7B): ALFWorld macro-avg success 91.8 / 96.1 / 92.0 vs GRPO
+46.1–81.2 (vanilla prompting 12.5–21.9); search-QA avg (NQ, TriviaQA,
+PopQA, HotpotQA, 2Wiki, MuSiQue, Bamboogle) 45.7 / 48.6 / 42.2 vs GRPO
+40.8–42.0; WebShop score 88.5 / 89.7 / 87.1 vs GRPO 79.8–80.9. Two
+practitioner-relevant findings beyond the headline: **internalizing skills
+beats prompting with them** — SEED trains with skills but deploys bare
+(no skill bank, retrieval, or extra prompt at inference) and still beats
+skill-prompted baselines (the repo's `run_*_skills.sh` scripts, which
+inject a top-k=6 skill memory into the prompt, are that baseline); and
+skills act as *privileged training-time supervision only*, so inference
+cost is unchanged.
+
+Scope caveats before citing: demonstrated at 1.7–7B on short-horizon envs
+(ALFWorld ≤30–50 steps, search ≤4 turns, per-step responses ≤512 tokens) —
+untested at Agents-A1's 131K-token trajectory scale, where §15's
+prefix-length decay of dense token signals is the open question
+`[heuristic]`; preprint, no peer-reviewed venue yet; and the paper reports
+β_opd/λ_opd and several batch/epoch values only via the repo, whose
+defaults do not everywhere match the paper's stated setup (e.g. the
+skills-prompt baseline script runs G=4 on search vs the paper's N=8).
