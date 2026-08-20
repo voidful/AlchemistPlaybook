@@ -415,7 +415,8 @@ const DATA = {
     { n: "AlpacaEval 2 / Arena-Hard / MT-Bench", id: "2404.04475", a: "Benchmarks", v: "paper", u: "LLM-judge win-rate / Elo (relative, judge-dependent)" },
     { n: "HTML-artifact workflow (Anthropic blog)", id: "claude.com", a: "Workflow", v: "reported", u: "HTML-over-Markdown artifact discipline — never cited for hyperparameters", link: "https://claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html" },
     { n: "FSQ-campaign dashboard", id: "exemplar", a: "Workflow", v: "reported", u: "Report-detail exemplar for §4 dashboard standard — not training evidence" },
-    { n: "little-coder / smallcode", id: "excluded", a: "Workflow", v: "excluded", u: "Reviewed in full: no training runs — kept only as harness-quality triage context" }
+    { n: "little-coder / smallcode", id: "excluded", a: "Workflow", v: "excluded", u: "Reviewed in full: no training runs — kept only as harness-quality triage context" },
+    { n: "Anthropic Natural Language Autoencoders", id: "excluded", a: "Workflow", v: "excluded", u: "Interpretability method only — no training-recipe evidence; background for the SAE-feature diversity metric", link: "https://transformer-circuits.pub/2026/nla/" }
   ],
   decisions: [
     { id: "0001", d: "2026-06-12", t: "Evidence-based routing skill", p: "Every value traces to a source or is labeled heuristic; thin SKILL.md + routed reference files; fixed Diagnosis/Recipe/Evidence/Verify format.", f: "0001-evidence-based-routing-skill.md" },
@@ -424,6 +425,8 @@ const DATA = {
     { id: "0004", d: "2026-08-19", t: "Two-road documentation", p: "Interactive HTML for humans (this page), indexed markdown for agents; six governance invariants; deterministic checker.", f: "0004-two-road-documentation.md" }
   ],
   commits: [
+    { d: "2026-08-19", s: "Add MiniCPM5-1B, OpenThoughts, GRAPE: reasoning-SFT data curation, RL length-control guardrail, 1B RL-teachers→OPD" },
+    { d: "2026-08-19", s: "Add Rethinking-OPD: OPD preconditions, overlap-ratio diagnostic, cold-start recovery" },
     { d: "2026-08-19", s: "Adopt two-road living documentation (decision 0004)" },
     { d: "2026-07-11", s: "Raise report standard to FSQ-campaign exemplar and beyond; rebuild dashboard template" },
     { d: "2026-07-11", s: "Add experiment-tracking workflow: HTML artifacts + git + GitHub Pages" },

@@ -87,8 +87,8 @@ Rules that matter more than the LR:
   ever being trained to reproduce the mistake. Generalizes the prompt-mask
   rule: loss-mask anything you want conditioned on but not imitated.
 - **Scale SFT hyperparameters with dataset size, not just model size.**
-  OpenThoughts' ladder `[paper — App. D Table 9]`, tuned across 1000+
-  reasoning-SFT runs on a 7B: <1K samples → LR 1e-5, batch 32, 13 epochs;
+  OpenThoughts' scale-dependent ladder `[paper — App. D Table 9]`, used
+  across their 1000+ reasoning-SFT runs on a 7B: <1K samples → LR 1e-5, batch 32, 13 epochs;
   1K–3.16K → 2e-5 / 96 / 7; 3.16K–31.6K → 4e-5 / 128 / 5; >31.6K (incl.
   the 1.2M run) → 8e-5 / 512 / 5 + packing. LR and batch *grow* and epochs
   *shrink* with dataset size — the many-epoch exception for tiny sets is
@@ -271,20 +271,20 @@ RL guardrails: monitor KL to reference, mean reward, and response length
 together — reward↑ + KL↑ + length↑ is the hacking signature. Penalize
 missing EOS (Tulu 3's −10) to prevent run-on generations.
 
-**The length-hacking variant to watch for on reasoning RLVR** (MiniCPM5-1B
-`[paper — OpenBMB/MiniCPM README + figures]`): with an accuracy-only reward
-and a hard generation cap, the model learns to keep generating to the
-max-token budget, "trying" candidate answers until truncation — on the SFT
-checkpoint 42.3% of AIME-2025 and 47.7% of HMMT responses hit max_tokens.
-Their fix combines (1) an **accuracy + length-penalized reward** and (2) a
-**two-stage max-response-length schedule** — train reasoning RL stage 1 at
-30,720 max tokens (with a repetition penalty), then raise to 38,912 for
-stage 2 (accuracy-focused) — rather than starting with the full budget.
-After RL+OPD the overlong rate fell to 9.6% / 7.2% (AIME-2025 / HMMT)
-while accuracy more than doubled (§13). Same lever family as Long2Short's
-λ=0.2 brevity reward (§10) and Tulu 3's EOS penalty: shape length via
-reward and schedule, not truncation alone. Numeric penalty coefficients
-are **not stated**.
+**Overlong-response control on reasoning RLVR** (MiniCPM5-1B `[paper —
+OpenBMB/MiniCPM README + figures]`): the SFT checkpoint ran to the
+max-token budget on 42.3% of AIME-2025 and 47.7% of HMMT responses —
+generating until truncation instead of committing to an answer. Their RL
+recipe attacks it with a **two-stage max-response-length schedule**:
+reasoning RL stage 1 at 30,720 max tokens with a **repetition penalty**,
+then stage 2 (accuracy-focused) with the cap raised to 38,912 — rather
+than starting at the full budget. After RL+OPD the overlong rate fell to
+9.6% / 7.2% (AIME-2025 / HMMT) while accuracy more than doubled (§13).
+Same lever family as Long2Short's λ=0.2 brevity reward (§10) and Tulu 3's
+EOS penalty: shape length via reward and schedule, not truncation alone.
+The reward's exact shape is **not stated** (an explicit length-penalty
+term is `[reported — practitioner-talk reading]`, not in the official
+README), nor is the repetition-penalty coefficient.
 
 ## 6. Post-training failure modes
 
@@ -297,7 +297,7 @@ are **not stated**.
 | SFT model parrots prompts | loss not masked | mask prompt tokens (Llama 2) |
 | RM score up, humans unimpressed | reward hacking | verifiable rewards, KL watch, fresh on-policy evals |
 | RL run collapses; responses grow until they hit the context window | RL dataset scaled far past saturation | scale RL *epochs*, not dataset size (EvoLM: collapse at 350–400K examples; saturation 4–8 ep / 50–100K) |
-| Reward climbing but a large share of responses hit the max-token cap | accuracy-only reward under a hard cap — length hacking by "trying" answers until truncation | length-penalized reward + staged max-length raise (MiniCPM5 30,720→38,912, §5); Long2Short λ=0.2 (§10) |
+| Reward climbing but a large share of responses hit the max-token cap | no length shaping under a hard cap — model generates until truncation instead of committing | repetition penalty + staged max-length schedule (MiniCPM5 30,720→38,912, §5); Long2Short brevity reward λ=0.2 (§10) |
 | Multi-domain agent SFT regresses IF / general QA | conflicting reasoning patterns in one SFT mix (single-turn long-thinking vs multi-turn tool-use) | domain teachers + multi-teacher OPD (§13, Agents-A1) |
 | OPD loss falls but student benchmarks flat despite a stronger teacher | teacher fails an OPD precondition: thinking-pattern mismatch, or same-pipeline teacher with nothing new at student-visited states | check top-k overlap ratio + entropy gap; swap teacher, or off-policy cold start + teacher-aligned prompts (§15, Rethinking-OPD) |
 
@@ -647,11 +647,14 @@ AIME-2026 15.6→40.4, HMMT-Feb-26 11.9→25.8, LCB-v6 20.6→33.5, IFEval
 42.57 vs Qwen3-0.6B 26.77 / Qwen3.5-0.8B 25.14 / LFM2.5-1.2B 35.61
 `[paper — eval table]`. Not stated anywhere: OPD top-k value, the RL
 algorithm base and KL/clip coefficients, all LRs/batch sizes, teacher
-checkpoint selection — **do not invent them**. For *why* this OPD setup works — and what to check before
-copying it with a different teacher — see §15: Agents-A1's teachers are
-branched from the student's own SFT checkpoint (thinking-pattern match by
-construction) and carry RL-gained capability the student lacks, i.e. both
-Rethinking-OPD preconditions hold by design.
+checkpoint selection — **do not invent them**.
+
+For *why* these OPD setups work — and what to check before copying one
+with a different teacher — see §15: both recipes' teachers (Agents-A1's
+domain branches, MiniCPM5's capability-RL runs) are branched from the
+student's own SFT checkpoint (thinking-pattern match by construction) and
+carry RL-gained capability the student lacks, i.e. both Rethinking-OPD
+preconditions hold by design.
 
 ## 14. Synthetic-data curation by feature coverage (FAC / SAE)
 
@@ -804,7 +807,8 @@ rule when several candidate answers exist per instruction.
    diversity goal (§9).
 2. **Better benchmark scores ≠ better teacher.** QwQ-32B-taught students
    beat DeepSeek-R1-taught students by +2.6 (math) / +1.9 (code) even
-   though R1 outscores QwQ-32B by 8–23 points on the same benchmarks.
+   though R1 outscores QwQ-32B by 8–23 points on CodeElo / GPQA-Diamond /
+   JEEBench.
    Convergent with GRAPE below and FAC's backbone-aligned-generator result
    (§14): *fit* beats generator strength.
 3. **Answer verification/filtering did not help**: "the no-filtering
