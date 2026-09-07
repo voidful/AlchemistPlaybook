@@ -54,6 +54,23 @@ python3 -m unittest discover -s tests
 | Add or run evals | [docs/workflows/run-evals.md](docs/workflows/run-evals.md) |
 | Change direction / structure | Decision record first ([conventions](docs/conventions.md) → frontmatter format) |
 
+## Task scope and completion
+
+Use the index to select the docs relevant to the change. Small wording fixes
+do not require a full reference-library review. For skill behavior changes,
+follow [decision 0006](docs/decisions/0006-task-scoped-skill-guidance.md).
+
+Carry requested local changes through relevant validation and packaging.
+Existing authorization covers the necessary local edits and checks; do not
+add another approval step for them. Follow the user's scope and format over
+skill workflow defaults while preserving the invariants above. A training
+launch or publication requires authorization for that action, not merely a
+request to prepare its files.
+
+Run the required checks above. After they pass, add or repeat checks only
+for changed behavior, failures, or unresolved concerns. Keep behavioral eval
+definitions separate from executed results and identify unrun validation.
+
 ## Provenance
 
 The founding charter (imported Claude Cowork instruction, 2026-06) is

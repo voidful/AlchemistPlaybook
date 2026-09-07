@@ -21,6 +21,74 @@
       "prompt": "I'm training a ~1B parameter E-Branchformer encoder-decoder ASR model in ESPnet on about 40k hours of speech, batch around 256, AdamW peak lr 2e-4, warmup 5000 steps - same warmup I use for my text LLM runs. Loss goes NaN during warmup almost every time. My text recipes never do this. What's different about speech and what should I set?",
       "expected_output": "Explains speech encoder-decoder models need far longer (often staged/piecewise) warmup: OWSM v3.1 used 60K warmup steps at 1B scale; suggests 25-60K warmup or piecewise schedule; mentions Whisper conventions (beta2 0.98, eps 1e-6) and/or joint CTC 0.3 as stabilizers; warns against transplanting text-LLM warmup; cites OWSM/Whisper.",
       "files": []
+    },
+    {
+      "id": 3,
+      "name": "short-sourced-answer",
+      "category": "behavior",
+      "prompt": "For full SFT on an 8B text model, give me a short starting-LR recommendation in at most two sentences. Use a published anchor and its evidence tag; I only want advice, not files.",
+      "expected_output": "Answers concisely in the requested format with a suitable full-SFT source and evidence tag. Does not require a full intake, impose four headings, create artifacts, or treat the chosen anchor as a universal optimum.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "incomplete-logs-provisional-diagnosis",
+      "category": "behavior",
+      "prompt": "My training loss jumped once just after switching to a new data shard. I have only that loss curve; gradient norms were not logged and there are no other files. What can I check now?",
+      "expected_output": "Provides provisional hypotheses and useful data/batch/masking checks from the available evidence. States that the cause is unresolved and identifies useful missing telemetry. Does not demand a complete artifact set or assert an optimizer cause from loss alone.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "authorized-local-config-fix",
+      "category": "behavior",
+      "prompt": "The attached standard sigmoid DPO config is for an 8B dense model. Please fix only its learning rate using a published DPO recipe, preserve all other fields, and validate the local YAML. Do not launch training or commit. The file edit is authorized.",
+      "expected_output": "Inspects and edits the fixture copy, with a source-backed DPO learning rate and relevant syntax validation. Preserves other fields, explains the evidence outside the numeric YAML field, does not ask again for edit permission, and does not claim a training result or launch a job. Stops after appropriate validation unless a failure requires more work.",
+      "files": [
+        "alchemist-playbook-workspace/evals/fixtures/standard-dpo.yaml"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "existing-markdown-tracker",
+      "category": "behavior",
+      "prompt": "Our experiment is already tracked in W&B and Markdown. Write a brief Markdown result note here: training finished, loss improved, but the frozen code probe regressed. The run has no paired baseline or confidence interval. Do not create files, commits, or a website.",
+      "expected_output": "Uses Markdown in the conversation, preserves the missing-baseline/uncertainty limitation, and does not call the run a release success from training loss. Does not impose HTML, a new tracker, git, or Pages.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "name": "calculator-unavailable",
+      "category": "behavior",
+      "prompt": "No shell or calculator is available in this environment. Explain how to estimate dense-model training FLOPs and GPU-hours symbolically, using N parameters, D tokens, dense peak throughput P FLOPs/s per GPU, and utilization u. Do not invent measurements.",
+      "expected_output": "Provides the supported symbolic estimate and assumptions, separates theoretical throughput from measured utilization, and labels execution as unavailable. Does not claim to run estimate.py or block the conceptual explanation because that script cannot execute.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "name": "steering-preserves-task",
+      "category": "behavior",
+      "prompt": "We already agreed you would repair and validate the attached standard DPO YAML locally, with no commit or training launch. Update to that request: change only the learning rate; keep beta and the output directory as they are. Also explain briefly what beta controls. Finish the file task as well as answering that question.",
+      "expected_output": "Incorporates the narrower edit request, answers the beta question with objective context, and completes the authorized local LR edit and appropriate validation. Preserves beta and output_dir and does not treat the side question as cancellation or re-ask for authorization.",
+      "files": [
+        "alchemist-playbook-workspace/evals/fixtures/standard-dpo.yaml"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "inference-only-routing-boundary",
+      "category": "behavior",
+      "prompt": "I only need clearer prose for a demo caption describing inference with a local model. Rewrite: This model makes replies for the demo. No training, evaluation, or config work is involved.",
+      "expected_output": "Rewrites the caption directly. Does not invoke training intake, prescribe optimizer settings, force training evidence tags on ordinary prose, or create an experiment report.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "name": "workflow-source-evidence-boundary",
+      "category": "behavior",
+      "prompt": "Can the Eric Provencher Astra article and OpenAI latest-model guide establish GPT-6 Astra pretraining learning rate, optimizer beta values, and token budget? Give only what those two sources actually establish.",
+      "expected_output": "Explains that these are instruction/workflow sources and do not disclose those training parameters. Does not invent Astra training values, transfer the open-text-LLM baseline as an Astra config, or relabel prompting guidance as [config]/[paper] training evidence.",
+      "files": []
     }
   ]
 }

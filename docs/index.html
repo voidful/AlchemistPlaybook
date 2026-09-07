@@ -276,17 +276,19 @@
 // DATA — the only block to edit when facts change (docs/conventions.md).
 // ============================================================================
 const DATA = {
-  updated: "2026-08-20",
+  updated: "2026-09-07",
   repo: "https://github.com/voidful/AlchemistPlaybook",
   stats: [
     { v: "auto:sources", k: "sources in the bibliography" },
-    { v: "10", k: "routed reference files" },
+    { v: "11", k: "routed reference files" },
     { v: "8",  k: "ready-to-edit config templates" },
-    { v: "15/15", k: "eval expectations passed (11/15 without the skill)", up: "+4" },
-    { v: "5",  k: "decision records" },
+    { v: "15/15", k: "historical iteration-1 expectations (11/15 without skill)", up: "+4" },
+    { v: "Pending", k: "new behavior cases: defined, not executed" },
+    { v: "6",  k: "decision records" },
     { v: "≤1024", k: "hard cap on trigger description (chars)" }
   ],
   routing: [
+    { topic: "Text-LLM baseline — starting config, peak LR by size, cross-stage comparison", file: "text-llm-baselines.md" },
     { topic: "Pretraining from scratch — schedules (cosine/WSD), batch ramp, data mixes, midtraining/annealing, distillation, curriculum, edge architectures", file: "pretraining.md" },
     { topic: "Post-training — SFT, DPO, SimPO, ORPO, KTO, PPO, GRPO, RLVR, reward models, model merging", file: "post-training.md" },
     { topic: "Stability — loss spikes, NaN, divergence, grad-norm anomalies, precision, QK-norm, z-loss, MuonClip", file: "stability.md" },
@@ -295,7 +297,7 @@ const DATA = {
     { topic: "Scaling — compute/token budgets, Chinchilla, critical batch size, LR–batch coupling, muP, MFU", file: "scaling-and-batch.md" },
     { topic: "Diagnostics — symptom → cause → fix, monitoring setup, pre-launch checklist", file: "diagnostics.md" },
     { topic: "Evaluation — per-stage metrics and benchmarks, three-tier framework, retention suite, release gate", file: "evaluation.md" },
-    { topic: "Experiment tracking — HTML artifacts per change, dashboards, git discipline, GitHub Pages", file: "experiment-tracking.md" },
+    { topic: "Experiment records — existing trackers, optional HTML dashboards, git checkpoints, authorized publishing", file: "experiment-tracking.md" },
     { topic: "Bibliography with verification status", file: "sources.md" }
   ],
   ladder: {
@@ -322,7 +324,7 @@ const DATA = {
   },
   evals: {
     max: 5,
-    series: ["With skill", "Without skill"],
+    series: ["Historical: with skill", "Historical: without skill"],
     rows: [
       { name: "Pretrain loss-spike debug",  withSkill: 5, withoutSkill: 3 },
       { name: "DPO config review (β confusion)", withSkill: 5, withoutSkill: 4 },
@@ -414,17 +416,20 @@ const DATA = {
     { n: "SWE-bench (Verified)", id: "2310.06770", a: "Benchmarks", v: "paper", u: "Repo-level resolved rate" },
     { n: "LiveCodeBench", id: "2403.07974", a: "Benchmarks", v: "paper", u: "Contamination-resistant, time-windowed code eval" },
     { n: "AlpacaEval 2 / Arena-Hard / MT-Bench", id: "2404.04475", a: "Benchmarks", v: "paper", u: "LLM-judge win-rate / Elo (relative, judge-dependent)" },
-    { n: "HTML-artifact workflow (Anthropic blog)", id: "claude.com", a: "Workflow", v: "reported", u: "HTML-over-Markdown artifact discipline — never cited for hyperparameters", link: "https://claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html" },
-    { n: "FSQ-campaign dashboard", id: "exemplar", a: "Workflow", v: "reported", u: "Report-detail exemplar for §4 dashboard standard — not training evidence" },
+    { n: "Eric Provencher: Rethinking skills and prompts for GPT-6 Astra", id: "X article", a: "Workflow", v: "reported", u: "Concise discovery and task-specific reference loading; workflow guidance, not training evidence", link: "https://x.com/pvncher/status/2095991462416490862" },
+    { n: "OpenAI: Using GPT-6 Astra", id: "official guide", a: "Workflow", v: "reported", u: "Instruction scope, task completion, response format, and proportionate verification; not training evidence", link: "https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra" },
+    { n: "HTML-artifact workflow (Anthropic blog)", id: "claude.com", a: "Workflow", v: "reported", u: "Optional HTML reporting workflow — never cited for hyperparameters", link: "https://claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html" },
+    { n: "FSQ-campaign dashboard", id: "exemplar", a: "Workflow", v: "reported", u: "Report-detail exemplar for the optional dashboard catalog — not training evidence" },
     { n: "little-coder / smallcode", id: "excluded", a: "Workflow", v: "excluded", u: "Reviewed in full: no training runs — kept only as harness-quality triage context" },
     { n: "Anthropic Natural Language Autoencoders", id: "excluded", a: "Workflow", v: "excluded", u: "Interpretability method only — no training-recipe evidence; background for the SAE-feature diversity metric", link: "https://transformer-circuits.pub/2026/nla/" }
   ],
   decisions: [
-    { id: "0001", d: "2026-06-12", t: "Evidence-based routing skill", p: "Every value traces to a source or is labeled heuristic; thin SKILL.md + routed reference files; fixed Diagnosis/Recipe/Evidence/Verify format.", f: "0001-evidence-based-routing-skill.md" },
+    { id: "0001", d: "2026-06-12", t: "Evidence-based routing skill", p: "Every value traces to a source or is labeled heuristic; thin SKILL.md + routed reference files; Original fixed answer format and baseline placement are partially superseded by 0006.", f: "0001-evidence-based-routing-skill.md" },
     { id: "0002", d: "2026-06-15", t: "Three-tier evaluation framework", p: "Health monitoring ≠ capability evaluation ≠ release gate; retention suite for mid-training.", f: "0002-three-tier-evaluation-framework.md" },
-    { id: "0003", d: "2026-07-11", t: "HTML-artifact experiment tracking", p: "Every experiment change gets a self-contained HTML artifact, a commit, and a Pages URL — the commit log is the ablation log.", f: "0003-html-artifact-experiment-tracking.md" },
+    { id: "0003", d: "2026-07-11", t: "HTML-artifact experiment tracking", p: "Original HTML and git reporting workflow. Unconditional format and publishing requirements are partially superseded by 0006.", f: "0003-html-artifact-experiment-tracking.md" },
     { id: "0004", d: "2026-08-19", t: "Two-road documentation", p: "Interactive HTML for humans (this page), indexed markdown for agents; six governance invariants; deterministic checker.", f: "0004-two-road-documentation.md" },
-    { id: "0005", d: "2026-08-19", t: "Plugin packaging, versioned releases, tests, CI", p: "One-command Claude Code install (plugin manifests, no directory move), MIT license, CHANGELOG + version sync, stdlib test suite locking SKILL.md to estimate.py, GitHub Actions CI.", f: "0005-plugin-packaging-tests-ci.md" }
+    { id: "0005", d: "2026-08-19", t: "Plugin packaging, versioned releases, tests, CI", p: "One-command Claude Code install (plugin manifests, no directory move), MIT license, CHANGELOG + version sync, stdlib test suite locking SKILL.md to estimate.py, GitHub Actions CI.", f: "0005-plugin-packaging-tests-ci.md" },
+    { id: "0006", d: "2026-09-07", t: "Task-scoped guidance and progressive disclosure", p: "Short trigger, routed baselines, context-aware intake, user-selected formats, and proportionate verification. New behavior evals await execution.", f: "0006-task-scoped-skill-guidance.md" }
   ],
   commits: [
     { d: "2026-08-19", s: "Add MiniCPM5-1B, OpenThoughts, GRAPE: reasoning-SFT data curation, RL length-control guardrail, 1B RL-teachers→OPD" },

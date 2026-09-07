@@ -1,245 +1,125 @@
 ---
 name: alchemist-playbook
 description: >-
-  Evidence-based training-recipe advisor (煉丹調參) distilled from published
-  runs: LLaMA 1-3, OLMo 1-3, DeepSeek-V3, SmolLM2, MiniCPM5, Kimi K2, GLM-5,
-  PivotRL, Agents-A1, OPD, SEED, EvoLM, LFM2, VibeThinker, OpenThoughts, GRAPE,
-  FAC-Synthesis, Zephyr, Tulu 3, SimPO, ORPO, QLoRA, Whisper, OWSM, wav2vec
-  2.0, HuBERT. Use whenever the user asks about training hyperparameters
-  (learning rate, batch size, warmup, scheduler, optimizer, beta, weight
-  decay, epochs), debugging a training run (loss spike, NaN, divergence,
-  overfitting), designing a
-  pretraining/SFT/DPO/RLHF/RLVR/agentic-RL/LoRA/QLoRA/speech (ASR/TTS)
-  recipe, compute or token budgets, SFT data curation,
-  distillation/curriculum/merging, on-device models, what to
-  monitor or which benchmarks/eval suite per stage, capability
-  regression/forgetting, tracking/reporting training runs (實驗追蹤, HTML
-  run reports), or mentions 煉丹, 調參, "training recipe", "fine-tuning
-  settings", "what LR should I use", "eval suite", "release gate" — even if
-  they never say "hyperparameter".
+  Evidence-based model-training recipes and run diagnosis (煉丹調參).
+  Use for pretraining, SFT, preference tuning, RLVR, LoRA/QLoRA, or speech
+  training; training hyperparameters, loss spikes, data curation, compute
+  budgets, stage evaluation, and experiment reports. Pure inference setup
+  or general prompt writing is outside this skill's scope.
 ---
 
 # Alchemist Playbook
 
-Turn training-run tuning from folklore into engineering. Every recommendation
-in this skill traces to a published training run, an official config file, or
-an explicitly labeled heuristic. Your job when this skill is active: diagnose
-like a doctor, prescribe like an engineer, and cite like a researcher.
+Turn published training runs and official configs into recommendations
+that fit the user's model, data, and budget. Keep source evidence separate
+from observations about the user's run and from proposed experiments.
 
-## Operating principles
+## Task handling
 
-1. **Numbers come from sources, not vibes.** Every concrete value you give
-   must name its source run (e.g., "β₂=0.95 — LLaMA/OLMo standard"). If you
-   recommend something with no published backing, label it `[heuristic]`.
-   If sources disagree, give the range and say which source fits the user's
-   setup best.
-2. **Diagnose before prescribing.** Collect the intake facts below first.
-   A learning-rate answer for a 1B speech encoder and a 70B DPO run differ
-   by three orders of magnitude.
-3. **Data beats hyperparameters.** FineWeb, OWSM v4, and SmolLM2 each showed
-   data cleaning/mixing improvements that dwarf any optimizer tweak. When a
-   run underperforms and the config looks sane, route suspicion to data
-   first (see references/diagnostics.md triage order). For *synthetic* data,
-   measure diversity as model-feature coverage, not Distinct-n — surface
-   diversity anti-correlates with downstream results (FAC;
-   references/post-training.md §14).
-4. **Token-based accounting.** Express batch size in tokens, budgets in
-   tokens, warmup in steps *and* tokens. `tokens/step = n_gpu ×
-   micro_batch × seq_len × grad_accum`. Use `scripts/estimate.py` for all
-   arithmetic (FLOPs, GPU-hours, Chinchilla checks) — do not do this math
-   in your head.
-5. **Stage discipline.** Peak LR collapses roughly one order of magnitude
-   per stage: pretrain (1e-4..6e-4) → full SFT (2e-6..2e-5) → DPO
-   (2e-7..1e-6) → PPO/RLVR (3e-7..1e-6). LoRA runs ~10× above full-FT SFT.
-   If a user's SFT LR is ≥ their pretrain LR, that alone is the bug.
-6. **One change per rerun.** Define the success metric and observation
-   window before proposing a change. Never bundle three fixes you cannot
-   attribute afterwards.
-7. **Monitoring is not evaluation.** Health monitoring (step/hour: loss,
-   grad-norm, NaN, MoE balance) answers "is the run alive"; capability eval
-   (per N tokens: frozen val slices + downstream probes) answers "is it
-   getting stronger without forgetting"; the release gate (a *private*
-   holdout) answers "can it ship". A run can be healthy while regressing a
-   capability the total loss hides, or pass public benchmarks while failing
-   the product — total loss masks bucketed regressions and public sets leak.
-   See `references/evaluation.md` for the per-stage metric and benchmark
-   catalogs.
-8. **Every change gets an HTML artifact; every artifact gets a commit.**
-   Render experiment plans, config diffs, run results, and comparisons as
-   self-contained HTML files (not Markdown walls), keep them in the
-   experiment's git repo with a commit at every state change, and
-   recommend publishing the artifact tree via GitHub Pages so the current
-   state of every run is one shareable URL. Rule 6 then audits itself:
-   the commit log is the ablation log. Scope: this governs *tracked
-   experiments*, not chat answers — one-off advisory questions keep the
-   Output format below, and creating files or committing in the user's
-   repo needs their go-ahead first. Workflow, repo layout, and privacy
-   caveats: `references/experiment-tracking.md`; starter dashboard:
-   `assets/templates/experiment_dashboard.html`.
+- Use the conversation and available configs or logs before asking for
+  information. Ask only when a missing fact could change the next decision;
+  otherwise state the assumption and continue with a provisional answer.
+- Match the requested deliverable. A request to fix a local config includes
+  inspecting it, editing it, and performing relevant validation. Carry that
+  work through; an advisory question calls for an answer.
+- The user's instructions take precedence over this skill's workflow
+  defaults. Existing authorization persists; host permissions and required
+  repository checks still apply. Prepare useful local work while any
+  necessary approval for a training launch or publication remains pending.
+- If an instruction here blocks the task, identify the exact skill or
+  reference file, quote the applicable instruction, and explain the missing
+  decision. Do not turn a preferred workflow into an approval requirement.
+- Incorporate corrections and answer side questions while retaining the
+  unfinished task. State what was changed, what was verified, and what
+  remains unobserved before claiming completion.
 
-## Intake checklist
+These workflow choices draw on the instruction-design sources in
+`references/sources.md`; they do not require a particular agent model.
 
-Collect (ask only for what is missing, in one batch):
+## Training principles
 
-- Task type: pretrain / continued-pretrain (midtrain, anneal) / SFT / DPO-family / RLHF-RLVR / PEFT / speech
-- Model: size, architecture, dense or MoE, base checkpoint if any
-- Data: size (tokens or hours), source, cleaning status, epochs planned
-- Hardware: GPU count and type, framework (HF/TRL, DeepSpeed, FSDP, Megatron, ESPnet)
-- Symptom: the actual curves if debugging (loss, grad-norm, eval), when it started, what changed
-- Current config: optimizer, LR, schedule, batch, seq len, precision
+1. **Trace prescribed values.** Name the source run and preserve its
+   `[config]`, `[paper]`, or `[reported]` marking. Mark an extrapolation or
+   unsupported choice `[heuristic]`. If sources disagree, explain which
+   regime fits. Evidence levels are defined in `references/sources.md`.
+2. **Diagnose with available evidence.** Use the intake below as context,
+   not a prerequisite questionnaire. Separate plausible causes from a
+   confirmed cause; identify the observation that would distinguish them.
+3. **Check data and loss construction.** Inspect data quality, mixing,
+   template alignment, packing, and masking when symptoms support it.
+   `references/diagnostics.md` gives a triage order, not a required sequence
+   of experiments for every question.
+4. **Account for tokens and assumptions.** Use `scripts/estimate.py` for
+   its supported FLOPs, batch, budget, and LR lookups. Report input
+   assumptions and units. For unsupported calculations, use another
+   executable calculation and show the formula; if execution is unavailable,
+   provide the formula and label the result unverified.
+5. **Match the training regime.** Stage LR bands are starting anchors,
+   not universal laws. Full tuning, adapters, speech, MoE, and different
+   preference objectives are not interchangeable. Read the matching route
+   before transferring a recipe.
+6. **Make changes attributable.** Prefer an isolated change per diagnostic
+   rerun. If a repair needs coupled changes, explain the dependency and
+   avoid attributing the outcome to a single knob. Define a success metric,
+   observation window, and rollback or stop condition before launch.
+7. **Separate monitoring, evaluation, and release.** Healthy loss curves
+   do not establish capability gains. Use frozen capability slices and an
+   independent release holdout; see `references/evaluation.md`.
+8. **Keep experiment records useful.** Follow the user's existing tracker
+   and requested format. For a new report or campaign, the HTML dashboard
+   and git workflow in `references/experiment-tracking.md` are defaults.
+   Keep provenance and decision history in any format.
+
+## Intake
+
+Recover the facts relevant to the task: training stage; model size,
+architecture and checkpoint; data source, volume and cleaning; hardware
+and trainer; current optimizer, LR, schedule, batch, sequence length and
+precision; observed symptom, timing, and recent changes. Missing logs can
+limit certainty without preventing a useful diagnosis or config draft.
 
 ## Routing
 
-Read the matching reference before answering anything non-trivial:
+Read the reference sections needed for the task; the table is not a reading
+checklist. Use multiple routes when the problem crosses topics.
 
 | Topic | File |
 | --- | --- |
-| Pretraining from scratch, schedules (cosine/WSD), batch ramp, data mixes, midtraining/annealing, distillation, difficulty-curriculum, hybrid/edge architectures | `references/pretraining.md` |
-| SFT, DPO, SimPO, ORPO, KTO, PPO, GRPO, RLVR, reward models, model merging | `references/post-training.md` |
-| Loss spikes, NaN, divergence, grad-norm anomalies, precision (bf16/fp16/FP8), QK-norm, z-loss, MuonClip | `references/stability.md` |
+| Text-LLM starting config, consensus baseline, peak LR by size, cross-stage LR comparison | `references/text-llm-baselines.md` |
+| Pretraining, cosine/WSD, batch ramp, data mixes, midtraining/annealing, distillation, curriculum, edge architectures | `references/pretraining.md` |
+| SFT, DPO, SimPO, ORPO, KTO, PPO, GRPO, RLVR, reward models, model merging, reasoning-data curation | `references/post-training.md` |
+| Loss spikes, NaN, divergence, grad norms, precision, QK-norm, z-loss, MuonClip | `references/stability.md` |
 | LoRA, QLoRA, low-budget fine-tuning | `references/peft.md` |
-| ASR, speech translation, speech SSL (wav2vec2/HuBERT), Whisper/OWSM, ESPnet | `references/speech.md` |
+| ASR, speech translation, speech SSL, Whisper/OWSM, ESPnet | `references/speech.md` |
 | Compute/token budgets, Chinchilla, critical batch size, LR–batch scaling, muP, MFU | `references/scaling-and-batch.md` |
-| Symptom → cause → fix lookup, monitoring setup, pre-launch checklist | `references/diagnostics.md` |
-| What metrics to monitor and which benchmarks to run per stage, three-tier eval framework, mid-training retention suite, minimal eval suites, release gate | `references/evaluation.md` |
-| Experiment planning & tracking: HTML artifacts per change, run reports/dashboards, git commit discipline, GitHub Pages publishing | `references/experiment-tracking.md` |
-| Full bibliography with verification status | `references/sources.md` |
+| Symptom → cause → fix, monitoring setup, pre-launch checks, incomplete logs | `references/diagnostics.md` |
+| Per-stage metrics and benchmarks, retention suites, independent release gates | `references/evaluation.md` |
+| Experiment records, optional HTML dashboards, git checkpoints, publishing an authorized report | `references/experiment-tracking.md` |
+| Bibliography and verification status, including workflow-only sources | `references/sources.md` |
 
-Multiple files often apply (e.g., a DPO loss spike → post-training + stability).
+## Deliver and verify
 
-## The consensus baseline (text LLM)
+For a substantive tuning or debugging answer, cover the diagnosis, proposed
+config changes, their evidence, and how to verify or roll back. Use
+**Diagnosis / Recipe / Evidence / Verify** headings when they help; a short
+question or a requested YAML diff can carry the same essentials directly.
+Do not invent a diagnosis for a pure estimate or rewrite a user's format.
 
-When the user has no strong reason to deviate, this is the default stack.
-It is the de-facto intersection of LLaMA 1/2/3, OLMo 1/2/3, SmolLM2, and
-DeepSeek-V3:
+For file changes, run the relevant parser, calculator, or existing checks.
+Complete repository-required checks, then stop expanding verification unless
+new edits, failures, or unresolved concerns justify more. A config parsing
+success is not a successful training run. A reviewed eval definition is not
+an executed model evaluation. Parallel source reviews or independent evals
+can help larger tasks when the host permits them; they are not prerequisites.
 
-| Knob | Default | Source anchor |
-| --- | --- | --- |
-| Optimizer | AdamW | universal across open recipes |
-| β₁, β₂ | 0.9, 0.95 | LLaMA, OLMo, DeepSeek (β₂=0.999 invites spikes at scale) |
-| ε | 1e-8 | OLMo 2 moved 1e-5 → 1e-8 for stability (config-verified) |
-| Weight decay | 0.1 | LLaMA, OLMo, Whisper |
-| Grad clip (global norm) | 1.0 | universal |
-| Warmup | ~2000 steps (≈ first 1% of tokens); 8000 for 405B-scale | LLaMA 2/3, OLMo 2 (8.4B tokens), Llama 3 405B |
-| Schedule | cosine → 10% of peak; WSD if total budget undecided | LLaMA/OLMo vs SmolLM2/MiniCPM |
-| Precision | bf16 compute, fp32 grad-reduce and norms | OLMo 2, BLOOM lesson |
-| Batch | in tokens: ~2M (≤2B), ~4M (7–13B), 8–16M with ramp (≥70B) | SmolLM2, LLaMA, Llama 3 |
-| Dropout | 0 in pretraining; ≤0.1 only for tiny-data fine-tunes | LLaMA/OLMo |
-| Bias terms | none in linears or norms | LLaMA/OLMo |
-| z-loss | off by default; 1e-4 (PaLM) or 1e-5 (OLMo 2) if output logits drift | PaLM, OLMo 2 |
+## Resources
 
-Peak pretraining LR by dense model size (AdamW, standard parametrization):
-
-| Size | Peak LR | Verified examples |
-| --- | --- | --- |
-| 100M–2B | 2e-4 – 1e-3 | SmolLM2-1.7B 5e-4 (11T tokens), OLMo-1B 4e-4, EvoLM-1B 2e-4 (config-verified) |
-| 7–13B | 3e-4 | LLaMA-7B/13B, OLMo-1/2 7B and 13B (config-verified) |
-| 30–70B | 1.5e-4 – 6e-4 | LLaMA-33B/65B and Llama-2-70B 1.5e-4; OLMo-2-32B 6e-4 (newer stability stack + 8M batch) |
-| ~405B | 8e-5 | Llama 3 405B (warmup 8000, cosine to 8e-7 over 1.2M steps) |
-| MoE | per-report | DeepSeek-V3 2.2e-4 (671B/37B-active); Moonlight/K2 use Muon — see stability.md |
-
-For sub-3B / on-device targets the highest-leverage levers are usually
-**distillation from a larger teacher** and **difficulty-ordered curriculum**,
-not these knobs — and a hybrid conv+attention backbone may beat an all-attention
-decoder under latency/memory budgets (LFM2). See `references/pretraining.md` §6–7.
-For a small **reasoning** model specifically, the diversity-first SFT →
-signal-amplifying RL recipe (SSP + MGPO, with the SFT checkpoint selected by
-Pass@K) and CLR test-time scaling are the levers (VibeThinker;
-`references/post-training.md` §9–10). The strongest published ≤1B pipeline
-is MiniCPM5-1B: staged-decay pretrain (pretraining.md §4) → parallel RL
-teachers → on-policy distillation (post-training.md §13). When *building*
-a reasoning-SFT dataset, follow the OpenThoughts/GRAPE curation rules
-(post-training.md §16).
-
-## Cross-stage LR ladder (~8B dense example)
-
-```
-pretrain        3e-4      (LLaMA/OLMo)
-   ↓ ÷ ~30–60
-full SFT        5e-6–2e-5 (Tulu 3: 5e-6; Zephyr/Llama-2-chat: 2e-5)
-   ↓ ÷ ~10–40
-DPO             5e-7      (Zephyr, Tulu 3 8B; 70B+: 2e-7)
-PPO/RLVR        3e-7–1e-6 (Tulu 3 PPO 3e-7; GRPO 1e-6)
-LoRA/QLoRA SFT  1e-4–2e-4 (QLoRA; ~10–20× full-FT, exception to the ladder)
-```
-
-## Output format
-
-Structure every tuning/debugging answer exactly like this:
-
-```
-## Diagnosis
-Ranked, most-probable causes given the symptoms. 1–3 items, each tied to
-something observable in the user's run.
-
-## Recipe
-Concrete changes as a config diff (old → new), with exact values.
-
-## Evidence
-One line per change: which published run or config backs it.
-
-## Verify
-What metric to watch, over how many steps, to confirm the fix worked —
-plus the rollback plan if it does not.
-```
-
-**Worked micro-example.** User: "7B pretrain, loss spikes at 80B tokens,
-β₂=0.999, eps=1e-5, no QK-norm."
-
-```
-## Diagnosis
-1. β₂=0.999 keeps a long second-moment memory; one bad batch poisons the
-   denominator for thousands of steps — the classic spike amplifier.
-2. ε=1e-5 is large enough to distort small-gradient updates at 7B scale.
-
-## Recipe
-optimizer.betas: (0.9, 0.999) → (0.9, 0.95)
-optimizer.eps:   1e-5 → 1e-8
-If spikes persist: rewind to the checkpoint before the spike and skip the
-~200 offending batches; consider QK-norm for the next run.
-
-## Evidence
-β₂=0.95: LLaMA 1/2/3, OLMo 1/2. ε=1e-8: OLMo 2 official configs.
-Rewind-and-skip: PaLM §5.1 (skip 200–500 batches), OLMo.
-QK-norm: OLMo 2, Wortsman et al. 2309.14322.
-
-## Verify
-Grad-norm should stay <2× its running median for the next 5k steps; loss
-returns to the pre-spike trend within ~1B tokens. Rollback: restore β₂ only
-if optimization noticeably slows (rare).
-```
-
-## Tools
-
-- `scripts/estimate.py` — run for every quantitative claim:
-  - `python scripts/estimate.py flops --params 7e9 --tokens 2e12 --gpus 64 --gpu h100 --mfu 0.4`
-  - `python scripts/estimate.py chinchilla --params 7e9` (or `--tokens 1.4e13`)
-  - `python scripts/estimate.py batch --gpus 8 --micro 4 --seq 4096 --accum 8 [--target-tokens 4e6]`
-  - `python scripts/estimate.py lr --params 8e9 --stage sft` (ladder lookup with sources)
-- `assets/templates/` — ready-to-edit configs: TRL SFT/DPO/QLoRA YAMLs,
-  Accelerate+DeepSpeed ZeRO-3 launcher, DeepSpeed ZeRO-2/ZeRO-3-offload
-  JSONs, and a framework-neutral 1B pretrain spec. Hand these to the user
-  instead of writing configs from scratch; adjust values per the references.
-- `assets/templates/experiment_dashboard.html` — self-contained experiment
-  dashboard implementing the report-detail standard (experiment-tracking.md
-  §4; the §4.8 agentic-RL collapsible-trajectory rendering is the one
-  extension left per-experiment): status-strip stat tiles, goal-progress
-  panel (target, gap, trend ETA, on/off-track), captioned SVG line
-  charts with TB/W&B-style smoothing (raw ghost) and log-y toggles, eval
-  table, sweep scatter, run/experiment ladder with gates + repro metadata,
-  decision ledger, inference-vs-GT sample gallery (text/audio/image), job
-  chain, staleness self-check banner, provenance footer. Data lives in one
-  JSON `const` at the top;
-  empty sections hide themselves. Copy to `docs/index.html` in the
-  experiment repo and edit only that block per run.
-
-## Honesty rules
-
-- Never present an unverified number as verified. The references mark each
-  value `[config]` (read from an official config/model card), `[paper]`
-  (stated in the paper), or `[reported]` (secondary source) — propagate
-  that marking into answers when precision matters.
-- When the user's setup falls outside all published regimes (exotic
-  architecture, unusual modality), say so, anchor to the nearest regime,
-  and recommend a small pilot run instead of false confidence.
-- Cost estimates: always label assumed $/GPU-hour as an assumption.
+- `scripts/estimate.py`: `flops`, `chinchilla`, `batch`, and `lr` commands;
+  use `--help` for inputs. Keep assumed utilization and prices explicit.
+  `references/scaling-and-batch.md` explains the estimates' limits.
+- `assets/templates/`: editable pretrain, SFT, DPO, QLoRA, Accelerate and
+  DeepSpeed configs. Adapt a matching template to the installed trainer;
+  preserve the user's existing config when editing one.
+- `assets/templates/experiment_dashboard.html`: optional report starter.
+  Copy it for a requested dashboard, edit its data block, and consult
+  `references/experiment-tracking.md` for applicable reporting detail.

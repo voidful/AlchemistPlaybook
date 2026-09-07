@@ -2,7 +2,7 @@
 type: glossary
 title: Glossary
 status: active
-updated: 2026-08-19
+updated: 2026-09-07
 ---
 
 # Glossary
@@ -43,12 +43,12 @@ rather than redefining them inside other docs.
 (Defined here only as needed to read the docs; the skill files are the home
 for their full treatment.)
 
-- **Consensus baseline** — the default optimizer/schedule/batch stack in
-  SKILL.md, the de-facto intersection of LLaMA 1–3, OLMo 1–3, SmolLM2, and
-  DeepSeek-V3.
-- **LR ladder** — the skill's rule that peak learning rate drops roughly an
-  order of magnitude per stage (pretrain → SFT → DPO → PPO/RLVR), with
-  LoRA/QLoRA as the documented exception (~10–20× above full-FT SFT).
+- **Consensus baseline** — a starting optimizer/schedule/batch stack
+  synthesized from published text-LLM runs. Home:
+  [text-llm-baselines.md](../alchemist-playbook/references/text-llm-baselines.md).
+- **LR ladder** — illustrative learning-rate anchors across training
+  stages, with separate adapter-tuning regimes. It is a lookup aid, not a
+  universal stage ratio. Home: the baseline reference above.
 - **Three-tier evaluation** — health monitoring ("is the run alive") vs
   capability evaluation ("is it getting stronger without forgetting") vs
   release gate ("can it ship" — a private holdout). Home:

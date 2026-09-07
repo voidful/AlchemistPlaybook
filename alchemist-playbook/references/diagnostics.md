@@ -1,6 +1,6 @@
 # Diagnostics: symptom → cause → fix
 
-Use with the SKILL.md output format. Triage order when several explanations
+Use with the task and output guidance in SKILL.md. Triage order when several explanations
 fit: **data → batching/masking → LR/schedule → precision → optimizer →
 architecture**. This ordering is empirical: FineWeb, OWSM v4, and SmolLM2
 all located their wins in data; PaLM/OLMo located spikes in batch×state;
@@ -66,9 +66,12 @@ benchmark-by-capability tables, and ready-to-use minimal eval suites, see
 
 ## When the user's report is incomplete
 
-Ask for exactly these four artifacts before diagnosing spikes:
-(1) loss curve, (2) grad-norm curve, (3) the config (optimizer block +
-batch math), (4) what changed relative to the last healthy run. Refuse to
-hypothesize from loss alone when grad-norm is one click away — wrong-layer
-diagnoses (blaming LR for a data bug) are the main failure mode of
-human and AI tuners alike.
+Look for the loss curve, grad-norm curve, optimizer and batch config, and
+changes since the last healthy run in the supplied files or logs. Reuse
+what is available; ask for the missing observation that would most change
+the diagnosis, rather than requiring the complete set.
+
+With loss alone, give provisional causes and inexpensive checks, state
+that the cause is unresolved, and explain what a grad-norm or batch replay
+would distinguish. Avoid a confident optimizer prescription without that
+evidence. Continue any independently justified config review or local fix.

@@ -6,6 +6,12 @@ Verification levels used across this skill:
 - `[paper]` — value stated in the technical report / paper.
 - `[reported]` — secondary source or community-standard value; flag when
   precision matters.
+- `[heuristic]` — an explicitly labeled recommendation or synthesis that
+  is not a published value for the user's regime.
+
+Workflow sources below use `[reported]` to identify practitioner or product
+guidance, including official prompting documentation. This does not make
+them training configs or evidence for a hyperparameter.
 
 ## Pretraining
 
@@ -119,13 +125,15 @@ stated in that file are properties of the named benchmark:
 
 | Source | ID / link | Used for |
 | --- | --- | --- |
+| Eric Provencher, "Rethinking skills and prompts for GPT-6 Astra" | [Original X article](https://x.com/pvncher/status/2095991462416490862), read 2026-09-07 | `SKILL.md`: concise discovery, task-specific reference loading, and removal of obsolete workflow constraints. `[reported]` instruction-design guidance; not training evidence. |
+| OpenAI, "Using GPT-6 Astra" | [Official model guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra), read 2026-09-07 | `SKILL.md` task handling and `experiment-tracking.md` scope: carry authorized work to completion, expose instruction conflicts, adapt response structure, and calibrate verification. `[reported]` product guidance; not a training recipe or a requirement to use this model. |
 | "Using Claude Code: the unreasonable effectiveness of HTML" (Thariq Shihipar, Anthropic) | claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html (2026-05) | `experiment-tracking.md`: HTML-over-Markdown artifact discipline — self-contained HTML for plans/reports, side-by-side comparison grids, artifact webs read by later sessions/verification agents. `[reported]` workflow practice, **not training evidence** — never cite it for a hyperparameter. |
 | FSQ-campaign dashboard (QwenVocabCodec) | eric-lam.com/vocodec/campaign (live page, retrieved 2026-07-11) | `experiment-tracking.md` §4 report-detail standard: the reference exemplar for dashboard depth — stat tiles with bounds/ETA, per-chart interpretation captions, hover-free eval table, gated experiment ladder, honest decision ledger ("NOT a gated comparison"), Slurm job chain, provenance footer. §4.8 (inference-vs-GT sample gallery) extends past the exemplar's noted gap: it shows no output-vs-ground-truth samples. `[reported]` presentation exemplar, **not training evidence**. |
 
-The git-commit-per-change and GitHub Pages mechanics in that file are
-standard git/GitHub product behavior; the Pages-is-public-even-for-private-
-repos caveat is from GitHub's own documentation. The commit-point and
-artifact-set conventions are `[heuristic]` extensions of principle 6.
+The commit-point and artifact-set conventions are `[heuristic]` extensions
+of the attribution principle. They apply when the chosen reporting workflow
+uses those tools; check the selected host's current visibility and settings
+when publishing.
 
 ## Reviewed and excluded (no training evidence)
 

@@ -1,32 +1,38 @@
-# Experiment tracking: HTML artifacts + git + GitHub Pages
+# Experiment tracking and optional HTML reports
 
 How to *record and present* an experiment. Complements principle 6 (one
 change per rerun — this file makes that auditable) and `evaluation.md`
 (what to measure). The HTML-artifact discipline follows Thariq Shihipar,
 "Using Claude Code: the unreasonable effectiveness of HTML" (claude.com
 blog, 2026-05) `[reported]` — a workflow practice, not training evidence.
-Git/Pages mechanics are standard GitHub features.
+The conventions below are `[heuristic]` reporting defaults. Apply them to
+the requested deliverable and available evidence; the instruction-design
+sources in `sources.md` explain the task-scoping rationale.
 
-## 1. The rule
+## Contents
 
-**Every change gets an HTML artifact, and every artifact gets a commit.**
-When this skill is active and the user is planning, running, or debugging
-experiments:
+1. Choose the reporting scope
+2. Optional HTML repo layout
+3. Artifact set
+4. Report detail catalog
+5. Commit discipline
+6. HTML artifact rules
+7. Publishing
+8. Relationship to live loggers
 
-- Render plans, config changes, run results, and comparisons as
-  **self-contained HTML files**, not Markdown walls. Markdown plans past
-  ~100 lines stop being read; HTML gives density (tables, inline-SVG
-  curves, color-coded config diffs, collapsible detail) and turns every
-  report into a shareable URL.
-- Put the experiment in a **git repo from day one** and commit at each
-  state change (plan approved / run launched / run finished / decision
-  made). One change per rerun (principle 6) then becomes automatic
-  attribution: the commit log *is* the ablation log.
-- Recommend the user enable **GitHub Pages** so the artifact tree is
-  browsable at a URL — teammates read a dashboard, not a diff (privacy
-  caveat in §7 applies before anything is published).
+## 1. Choose the reporting scope
 
-## 2. Repo layout
+Keep the hypothesis, exact config change, evidence, result, and decision
+traceable. Use the user's existing tracker, notes, and requested format.
+A short diagnosis or config edit does not require a dashboard or a new repo.
+
+For a requested campaign report with no established format, self-contained
+HTML is a useful default for comparisons and curves. Git checkpoints can
+record meaningful experiment states when committing is within scope.
+Publishing is a separate action governed by the existing authorization;
+prepare the local report before any missing publication approval.
+
+## 2. Optional HTML repo layout
 
 ```
 my-experiment/
@@ -43,18 +49,21 @@ my-experiment/
   README.md                  # one paragraph + link to the Pages URL
 ```
 
-Configs and results live *under* `docs/` so every link in every artifact
-resolves identically from `file://` and from the published Pages site —
-anything outside the Pages root would 404 on the public URL.
+For this layout, put shareable configs and results under the report root
+so relative links work locally and when hosted. Keep private raw artifacts
+outside that root; embed a suitable summary or link to the existing tracker.
 
 Start from `assets/templates/experiment_dashboard.html` for `index.html`.
 
-## 3. The artifact set
+## 3. Artifact set
+
+Use the rows needed for the chosen HTML workflow. Equivalent records in an
+existing tracker are sufficient; a plan does not need nonexistent results.
 
 | Stage | Artifact | Must contain |
 | --- | --- | --- |
 | Plan (before launch) | `plan.html` | hypotheses; ablation matrix (run × knob); per-run success metric **and observation window** (principle 6); baseline + rollback plan |
-| Launch (per run) | commit only | exact config committed under `docs/configs/`; run row added to dashboard as `running` |
+| Launch (per run) | launch record | exact config or its immutable tracker reference; job identifier and observed status |
 | Result (per run) | `runs/<id>/report.html` | config diff old→new; loss/eval curves as inline SVG; the pre-registered metric vs. its window; inference-vs-GT samples from the fixed probe set (§4.8); verdict (`kept` / `rolled-back`) and why |
 | Comparison | `compare/<topic>.html` | side-by-side grid of the candidate runs — same axes, same metric, one screenful |
 | Always | `index.html` | goal progress panel (§4.14: target, gap, trend ETA); run table: id, one-line change, status, headline metric, links to report/config; newest first |
@@ -63,12 +72,17 @@ Update `plan.html` only by appending an amendments section — never rewrite
 the pre-registered plan after results exist (that is how post-hoc
 rationalization sneaks in).
 
-## 4. Report detail standard (meet or exceed)
+## 4. Report detail catalog
 
 Reference exemplar: the FSQ-campaign dashboard at
-`eric-lam.com/vocodec/campaign` `[reported]` — a live page produced with
-this workflow. Generated dashboards and run reports must match or exceed
-its level of detail. Concretely, a dashboard is not done until it has:
+`eric-lam.com/vocodec/campaign` `[reported]`. Use its relevant features for
+a full campaign dashboard. Every result report needs the measured status,
+config provenance, comparison criterion, result or missing-data label, and
+decision. Select additional panels below to fit the experiment; do not
+invent data or delay a useful report to fill an inapplicable panel.
+
+All illustrative numbers and UI defaults in this catalog are `[heuristic]`
+examples, not observations of the user's run or training recommendations.
 
 1. **Status strip** — one row of stat tiles: progress vs. budget (steps or
    tokens, with %), latest train loss (with its components), the headline
@@ -129,11 +143,11 @@ TensorBoard/W&B, all implementable in static HTML:
     token-budgeted, the x-axis must be *tokens*, not steps — steps are
     not comparable across batch sizes (`scaling-and-batch.md` token
     accounting). State the unit on the chart.
-11. **Reproducibility block** (W&B run metadata, made mandatory): each
+11. **Reproducibility block** (W&B run metadata): each
     run records trainer git SHA (+ dirty flag), seed(s), data-manifest
     version/hash, framework + CUDA versions, and parent checkpoint
-    (lineage). A report a reader cannot reproduce from is a screenshot,
-    not a report.
+    (lineage). Record unavailable fields explicitly and limit the
+    reproducibility claim to what was captured.
 12. **Sweep view** (TB HParams / W&B sweeps): once ≥3 runs vary the same
     knob, add a knob-value vs. headline-metric scatter with the chosen
     setting marked (log-x when the knob is an LR/β-style magnitude);
@@ -162,26 +176,31 @@ TensorBoard/W&B, all implementable in static HTML:
     −7.2 → −3.8 → −0.8 pp per 50k steps). Answering "will we make it
     within budget?" honestly, at a glance, is this panel's whole job.
 
-The same bar applies per artifact: a run report that shows a curve but
-not the pre-registered window, a comparison grid without matched axes,
-an eval checkpoint with no GT-vs-output samples, or a run without its
-reproducibility block, is below standard. Run reports additionally render
-the FULL config with changed lines highlighted (W&B run-diff), not just
-the headline change — it is the visual check that rule 6 ("one change per
-rerun") actually held.
+For comparisons, use matched axes and report the registered observation
+window. Include fixed-probe samples when outputs are relevant and available.
+Link the full config and show its diff so readers can check attribution.
+If a coupled repair changes several fields, record the bundle and avoid
+claiming a single-field causal result. Missing baseline or preregistration
+must remain visible in the verdict.
 
 ## 5. Commit discipline
 
-- Commit points: plan approved → run launched → run finished → decision.
+For a workflow that includes git commits:
+
+- Useful commit points: plan ready → run launched → run finished → decision.
+  Follow the user's requested commit cadence; a local report edit does not
+  require a separate approval if already authorized.
 - Message convention: `run <id>: <the one change> — <headline result>`
   (e.g., `run 07-11a: beta2 0.999→0.95 — spikes gone, loss -0.02`).
   The log then reads as the experiment history without opening a file.
-- Commit the *inputs* (config, data-mix manifest, code SHA of the trainer)
-  with the launch, and the *outputs* (metrics file + report.html) with the
-  result — a run must be reconstructable from its two commits.
+- Record the *inputs* (config, data-mix manifest, trainer SHA) with the
+  launch and the *outputs* (metrics + report) with the result. Stage only
+  relevant files. Existing immutable tracker records can supply provenance.
 - Never force-push over published reports; corrections are new commits.
 
 ## 6. HTML artifact rules
+
+When HTML is the chosen deliverable:
 
 - **One file, no build step.** Inline CSS/JS; embed run data as a JSON
   `const` at the top of the file so updating = editing one block. Must
@@ -198,35 +217,29 @@ rerun") actually held.
   tiles, goal progress panel with trend ETA, captioned charts with
   smoothing + log-y, eval table, ladder with gates and repro, ledger,
   sample gallery, sweep scatter, job chain, staleness banner, footer;
-  agentic-RL collapsible trajectories are the one per-experiment
-  extension) — extend it per experiment; do not strip sections to save
-  effort.
+  agentic-RL collapsible trajectories need a per-experiment extension).
+  Include the sections needed for the decision and omit inapplicable ones.
 - Prompts that work well for generating these (adapted from the source
   article): "lay out the N candidate recipes as a single HTML grid so I
   can compare side by side"; "make a run report: render the config diff
   color-coded, plot the curves as inline SVG with an interpretation
   caption each, and state the verdict against the pre-registered metric".
 
-## 7. GitHub Pages setup
+## 7. Publishing
 
-**Privacy caveat (state it BEFORE recommending Pages):** a Pages site is
-publicly reachable on the internet even when the repo is private
-(access-controlled Pages is an Enterprise feature) — and publishing Pages
-from a private repo at all requires a paid plan (Pro/Team/Enterprise); on
-GitHub Free the repo itself must be public. If configs, data mixes, or
-eval numbers are proprietary, keep Pages off and open `docs/index.html`
-locally or host it on an internal static server — the artifact + commit
-discipline works identically without the public URL.
+For an authorized publishing task, check the actual host's visibility and
+the content that will be served, including linked configs and raw results.
+Do not infer site privacy from repository privacy. Use the user's chosen
+destination and an existing authorization when it covers these artifacts;
+ask only if the destination, audience, or shareable content is unresolved.
 
-Once the user confirms the artifacts are shareable:
+If GitHub Pages is selected, verify its current settings and documentation
+for the repository before deployment. Publishing and repository creation
+are not implied by a request for a local report. If publication needs a
+decision, finish and verify the local artifact first, then name the specific
+decision needed. A local file or an internal host can also serve the report.
 
-```bash
-git init -b main && git add -A && git commit -m "plan: <experiment name>"
-gh repo create <name> --private --source . --push
-# then: repo Settings → Pages → Source: Deploy from a branch → main, /docs
-```
-
-## 8. What this does NOT replace
+## 8. Relationship to live loggers
 
 W&B/TensorBoard-style loggers remain the right tool for live,
 high-frequency health monitoring (step-level loss, grad-norm — the

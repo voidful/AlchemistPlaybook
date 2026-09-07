@@ -2,7 +2,7 @@
 type: conventions
 title: Documentation and content conventions
 status: active
-updated: 2026-08-19
+updated: 2026-09-07
 ---
 
 # Conventions
@@ -40,11 +40,17 @@ updated: YYYY-MM-DD        # date of last substantive edit
 ```
 
 Decision records add `decided: YYYY-MM-DD` and optionally
-`supersedes: NNNN`. Links between docs are relative paths; a link to a
+`supersedes: NNNN` (or a sequence of IDs for several records). For a partial
+supersession, name the affected clauses in the new record and index; preserve
+the historical record's body. Links between docs are relative paths; a link to a
 missing file fails `scripts/check_docs.py`.
 
 ## Writing rules
 
+- Skill workflows describe applicable defaults and completion criteria.
+  Preserve evidence requirements, but avoid unconditional intake, format,
+  tool, and approval rules where the user's task supplies the choice.
+  See [decision 0006](decisions/0006-task-scoped-skill-guidance.md).
 - **Human-road prose follows ASD-STE100 (Simplified Technical English)
   principles.** This applies to `docs/index.html` visible text and
   `README.md`: short sentences (≤ 20 words for instructions, ≤ 25 for

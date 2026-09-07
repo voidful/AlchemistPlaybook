@@ -1,0 +1,8 @@
+# Synthetic evaluation input, not a recommended training recipe.
+model_name_or_path: example/sft-checkpoint
+loss_type: sigmoid
+beta: 0.01
+learning_rate: 2.0e-5
+num_train_epochs: 1
+max_length: 4096
+output_dir: runs/dpo-review

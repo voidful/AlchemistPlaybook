@@ -6,7 +6,7 @@
 <title>Experiment Dashboard</title>
 <script>
 // ─── EDIT THIS BLOCK ONLY ────────────────────────────────────────────────
-// Implements the report-detail standard of references/experiment-tracking.md
+// Implements the report-detail catalog of references/experiment-tracking.md
 // §4. Sections with an empty/missing array are hidden automatically.
 // runs: one entry per run, newest first (add new runs at the top).
 //   status: "running" | "kept" | "rolled-back" | "queued".
@@ -101,7 +101,7 @@ const EXPERIMENT = {
     knob: "peak LR",
     metric: "val loss @ 20k (probe runs)",
     xLog: true,
-    note: "3-point LR probe run before this ladder; 3e-4 chosen (SKILL.md 7–13B row)",
+    note: "3-point LR probe run before this ladder; 3e-4 chosen (text-llm-baselines.md, peak-LR table)",
     points: [
       { x: 1e-4, y: 2.93, id: "lr-a" },
       { x: 3e-4, y: 2.68, id: "lr-b", chosen: true },

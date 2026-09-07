@@ -2,7 +2,7 @@
 type: architecture
 title: Repository architecture
 status: active
-updated: 2026-08-19
+updated: 2026-09-07
 ---
 
 # Architecture
@@ -12,8 +12,8 @@ updated: 2026-08-19
 ```
 AlchemistPlaybook/
 ├── alchemist-playbook/            # THE SKILL (source of the .skill archive)
-│   ├── SKILL.md                   #   trigger description, principles, routing, baseline, output format
-│   ├── references/                #   10 evidence files (one topic each; see routing below)
+│   ├── SKILL.md                   #   trigger, task handling, principles, routing, delivery guidance
+│   ├── references/                #   evidence and task-specific baselines (see routing below)
 │   ├── scripts/estimate.py        #   FLOPs / Chinchilla / batch / LR-ladder calculator
 │   └── assets/templates/          #   8 ready-to-edit configs + experiment dashboard HTML
 ├── alchemist-playbook.skill       # packaged archive (build output — never edit directly)
@@ -33,15 +33,15 @@ AlchemistPlaybook/
 ```mermaid
 flowchart LR
     subgraph skill [alchemist-playbook/]
-        S[SKILL.md<br/>routing + baseline]
+        S[SKILL.md<br/>task handling + routing]
         R[references/*.md<br/>evidence]
         E[scripts/estimate.py]
         T[assets/templates/]
     end
     SRC[sources.md<br/>bibliography] --> R
     S -->|routes to| R
-    S -->|"run for every quantitative claim"| E
-    S -->|"hand to user"| T
+    S -->|"supported calculations"| E
+    S -->|"adapt when applicable"| T
     skill -->|package| PKG[alchemist-playbook.skill]
     PKG --> WS[workspace evals<br/>with vs without skill]
     WS -->|findings| R
@@ -54,15 +54,23 @@ flowchart LR
 1. The **trigger description** in SKILL.md frontmatter decides whether the
    skill activates (hyperparameters, run debugging, recipe design, eval
    suites, 煉丹/調參 …). Hard constraint: ≤ 1024 characters.
-2. The **intake checklist** collects task type, model, data, hardware,
-   symptom, current config.
+2. **Task handling and intake** recover relevant context from the user and
+   available files. Missing facts prompt a question only when they affect
+   the next decision; provisional work can continue.
 3. The **routing table** maps the topic to one or more reference files
    (pretraining, post-training, stability, peft, speech, scaling-and-batch,
-   diagnostics, evaluation, experiment-tracking, sources).
-4. `scripts/estimate.py` does all arithmetic (FLOPs, GPU-hours, Chinchilla,
-   tokens/step, LR-ladder lookup) — the skill forbids mental math.
-5. The answer follows the fixed **Diagnosis / Recipe / Evidence / Verify**
-   format, with every value evidence-marked.
+   diagnostics, evaluation, experiment-tracking, sources). Text-LLM baseline
+   and cross-stage LR questions use `references/text-llm-baselines.md`.
+4. `scripts/estimate.py` handles its supported calculations and LR lookups.
+   Other calculations use explicit formulas and executable checks when
+   available; an unexecuted estimate is labeled accordingly.
+5. The deliverable follows the user's format and scope. Substantive tuning
+   advice covers diagnosis, changes, evidence, and verification without
+   requiring fixed headings. Config edits include relevant local validation.
+   Reporting uses the existing tracker or an appropriate optional template.
+
+These boundaries are recorded in
+[decision 0006](decisions/0006-task-scoped-skill-guidance.md).
 
 ## Sync obligations (what must move together)
 

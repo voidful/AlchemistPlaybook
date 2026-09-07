@@ -2,7 +2,7 @@
 type: workflow
 title: Add a new source / recipe to the skill
 status: active
-updated: 2026-08-19
+updated: 2026-09-07
 ---
 
 # Workflow: add a source
@@ -23,16 +23,19 @@ model).
    `alchemist-playbook/references/sources.md` under the right section
    (Pretraining / Post-training / Speech / Systems / Evaluation / Workflow).
    One row per source: name, arXiv ID or link, and *what this skill uses it
-   for*. A source with no training evidence goes to "Reviewed and excluded"
-   instead — with the reason.
+   for*. Relevant instruction or reporting guidance belongs under Workflow,
+   marked as workflow-only and never used for a training value. Other
+   sources without applicable training evidence go to "Reviewed and
+   excluded" with the reason.
 3. **Integrate into reference file(s).** Add or extend the relevant
    `references/*.md` section(s), marking every value. Correct any existing
    numbers the new source contradicts — give the range and say which source
    fits which regime.
 4. **Update SKILL.md only if scope changed.** New topic keywords → trigger
    `description:` (**hard cap 1024 chars** — trim, don't overflow); new
-   routing target or renamed coverage → routing table row; new headline
-   source → the source list in the description.
+   routing target or renamed coverage → routing table row. A new source
+   alone belongs in the bibliography and relevant reference; do not grow
+   the trigger into a source catalog (see decision 0006).
 5. **Repackage** the archive: [release.md](release.md).
 6. **Check + eval.** Run `python3 scripts/check_docs.py`. If the addition
    claims to improve answers on a failure mode, add an eval for it

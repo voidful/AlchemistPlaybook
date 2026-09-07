@@ -2,7 +2,7 @@
 type: index
 title: Documentation index
 status: active
-updated: 2026-08-19
+updated: 2026-09-07
 ---
 
 # Documentation index
@@ -45,11 +45,12 @@ links back (invariant 4).
 
 | # | Decision | Status |
 | --- | --- | --- |
-| [0001](decisions/0001-evidence-based-routing-skill.md) | Evidence-based skill with routing-table architecture and verification levels | active |
+| [0001](decisions/0001-evidence-based-routing-skill.md) | Evidence-based skill with routing-table architecture and verification levels | active except baseline placement and fixed format; see 0006 |
 | [0002](decisions/0002-three-tier-evaluation-framework.md) | Three-tier per-stage evaluation framework (monitoring ≠ evaluation ≠ release gate) | active |
-| [0003](decisions/0003-html-artifact-experiment-tracking.md) | Experiment tracking = HTML artifacts + git commits + GitHub Pages | active |
+| [0003](decisions/0003-html-artifact-experiment-tracking.md) | Experiment tracking = HTML artifacts + git commits + GitHub Pages | active except unconditional workflow requirements; see 0006 |
 | [0004](decisions/0004-two-road-documentation.md) | Two-road documentation: interactive HTML for humans, indexed markdown for agents | active |
 | [0005](decisions/0005-plugin-packaging-tests-ci.md) | Plugin packaging (Claude Code + Codex manifests), MIT license, versioned releases, test suite, CI | active |
+| [0006](decisions/0006-task-scoped-skill-guidance.md) | Task-scoped guidance, progressive disclosure, flexible reporting, and proportionate verification | active |
 
 ## Knowledge homes outside `docs/`
 
@@ -58,8 +59,9 @@ place each — never duplicate these facts into `docs/`:
 
 | Fact family | Single home |
 | --- | --- |
-| Skill trigger, operating principles, consensus baseline, LR ladder, output format | [alchemist-playbook/SKILL.md](../alchemist-playbook/SKILL.md) |
-| Stage-specific recipes and evidence | [alchemist-playbook/references/](../alchemist-playbook/references/) (10 files; routing table in SKILL.md) |
+| Skill trigger, task handling, training principles, routing, output guidance | [alchemist-playbook/SKILL.md](../alchemist-playbook/SKILL.md) |
+| Text-LLM consensus baseline and LR ladder | [text-llm-baselines.md](../alchemist-playbook/references/text-llm-baselines.md) |
+| Stage-specific recipes and evidence | [alchemist-playbook/references/](../alchemist-playbook/references/) (routing table in SKILL.md) |
 | Bibliography + verification status | [alchemist-playbook/references/sources.md](../alchemist-playbook/references/sources.md) |
 | Quantitative estimation (FLOPs, Chinchilla, batch, LR ladder) | [alchemist-playbook/scripts/estimate.py](../alchemist-playbook/scripts/estimate.py) |
 | Ready-to-edit training configs + experiment dashboard | [alchemist-playbook/assets/templates/](../alchemist-playbook/assets/templates/) |
@@ -80,7 +82,7 @@ python3 -m unittest discover -s tests
 
 The checker enforces the indexing, routing-sync, and packaging invariants
 listed in [constitution.md](constitution.md). The tests cover `estimate.py`
-math, template validity, the SKILL.md ↔ `estimate.py` LR lock, §-citation
+math, template validity, the baseline reference ↔ `estimate.py` LR lock, §-citation
 integrity, and version sync. CI (`.github/workflows/ci.yml`) runs both on
 every push. User-visible changes are recorded in
 [CHANGELOG.md](../CHANGELOG.md); the release version lives in the plugin

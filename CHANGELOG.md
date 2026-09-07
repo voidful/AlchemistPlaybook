@@ -5,6 +5,32 @@ listed separately in each entry. The version here must match
 `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`
 (locked by `tests/test_doc_consistency.py`).
 
+## 1.2.0 — task-scoped guidance and progressive disclosure
+
+Skill behavior:
+
+- Shorten the trigger to training tasks and move the text-LLM baseline and
+  LR ladder to a routed reference. Preserve their calculator consistency
+  checks and mark the moved source anchors and transfer heuristics.
+- Replace mandatory intake and fixed answer headings with context-aware
+  task handling. Complete requested local config edits and relevant checks;
+  distinguish provisional diagnosis, syntax validation, and training results.
+- Follow the user's reporting format and existing tracker. Keep HTML,
+  git checkpoints, and publishing as scoped workflow options. Explain
+  coupled repairs without claiming an isolated causal result.
+- Add the Provencher article and OpenAI Astra guide as workflow sources,
+  with an explicit boundary against using them for training hyperparameters.
+
+Documentation and validation:
+
+- Rewrite the GitHub README around installation, realistic tasks, evidence
+  labels, workflow choices, and validation limits. Record partial
+  supersessions in decision 0006; preserve earlier decision bodies.
+- Add behavioral regression definitions and an isolated config fixture.
+  Fresh agent executions remain unrun; historical results remain unchanged.
+- Update repository guidance, routing, the report DATA block, plugin
+  descriptions and versions, and rebuild the skill archive.
+
 ## 1.1.0 — SEED (self-evolving OPD for agentic RL)
 
 Knowledge:
