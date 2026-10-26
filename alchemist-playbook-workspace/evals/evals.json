@@ -89,6 +89,13 @@
       "prompt": "Can the Eric Provencher Astra article and OpenAI latest-model guide establish GPT-6 Astra pretraining learning rate, optimizer beta values, and token budget? Give only what those two sources actually establish.",
       "expected_output": "Explains that these are instruction/workflow sources and do not disclose those training parameters. Does not invent Astra training values, transfer the open-text-LLM baseline as an Astra config, or relabel prompting guidance as [config]/[paper] training evidence.",
       "files": []
+    },
+    {
+      "id": 11,
+      "name": "agentic-midtraining-recipe",
+      "prompt": "We have a converged 30B-A3B MoE base pretrained at 8K context that has never seen agent traces, and our agentic-coding SFT keeps getting longer with diminishing SWE-bench gains and weaker RL afterwards. Design a midtraining stage to fix this: context length, data blend and shares, how to handle tool responses in traces, learning-rate schedule and replay share, where the stage sits relative to long-context extension, and how we should decide between candidate blends.",
+      "expected_output": "Proposes a 256K-context agentic midtraining stage before SFT and before the final long-context stage, citing the Nemotron 3.5 recipe (arXiv 2610.22019) with [paper] tags: mostly natural software-engineering data (issue-PR, import-connected repositories, diff/code-evolution, build logs) plus pretraining replay around 20% and a small long-context share; agentic traces capped near 10-15% of the blend with the best traces reserved for SFT; tool responses masked from the loss while tool calls are trained; a short warmup to a constant moderate LR with general-capability regression checks (the 5e-5 vs 1e-5 trade-off); midtrain-then-long-context ordering. Says candidate blends are decided by identical short fixed SFT runs on pinned agent harnesses with pass@1 and pass@k, not by base-model proxies such as bits-per-byte or LoCoDiff, and flags single-run noise of 1-2 points. Does not present the Nemotron numbers as guaranteed transfers to another model family.",
+      "files": []
     }
   ]
 }

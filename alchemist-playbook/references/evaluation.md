@@ -34,7 +34,7 @@ plainly because they are properties of the benchmark, not opinions.
 | Capability regression eval | is the checkpoint stronger / forgetting? | every N tokens / per epoch | frozen val slices + cheap downstream probes |
 | Release gate eval | decide go / no-go for ship | before release | full public benchmarks + private holdout + product/safety |
 
-Three rules that prevent most eval mistakes:
+Four rules that prevent most eval mistakes:
 - **Public benchmarks are for horizontal comparison; a private holdout eval is
   the release gate.** Public sets leak into training data over time
   (contamination); only a freshly-built, never-published holdout can gate a
@@ -48,6 +48,16 @@ Three rules that prevent most eval mistakes:
   only valid like-for-like, each run with its own finished schedule
   `[paper 2506.16029]`. WSD decay branches exist precisely to make this
   cheap (scaling-and-batch.md §6).
+- **Decide a midtraining recipe on identical downstream post-training, not
+  on base-model proxies.** Nemotron 3.5's agentic midtraining `[paper
+  2610.22019]`: held-out repository/trace bits-per-byte, LoCoDiff, and
+  RepoBench all improved monotonically with midtraining tokens, yet "did
+  not track post-training results closely enough to guide recipe
+  decisions"; every recipe choice was made on a **short fixed SFT** (33B
+  tokens, identical blend and settings for every candidate and for the
+  stage-input base) whose gains carried over to full SFT (100B). Proxies
+  are trend monitors; identical short post-training is the decision
+  signal (§4).
 
 ## 2. Pre-training: what to monitor
 
@@ -114,6 +124,7 @@ target capability ↑   −   general capability forgotten   −   safety regres
 | Math reasoning | final-answer accuracy, CoT length, invalid-reasoning ratio, self-consistency gain | is it really reasoning vs memorizing |
 | Code | compile rate, unit-test pass, syntax/import errors, repo-level success | is the code executable, not just plausible |
 | Tool prep | tool-schema valid rate, argument exact match, tool-selection accuracy | mandatory if tool/agent ability is a goal |
+| Agentic-coding prep | identical-short-SFT SWE-bench / Terminal-Bench pass@1 **and** pass@k (decision signal); trend-only: LoCoDiff exact match / edit distance, RepoBench edit similarity, repository BPB, decisive-turn trace BPB | proxies rise long before post-SFT scores move — **never pick a blend or LR on them alone** (Nemotron 3.5 `[paper 2610.22019]`) |
 | Safety regression | harmful compliance, jailbreak ASR, false refusal | **prevent capability gains from eroding the safety boundary** |
 
 **Mid-training must own a fixed retention suite**, minimally:
@@ -129,8 +140,45 @@ tool use. Mid-training eval by training type:
 | Code boost | HumanEval, MBPP, LiveCodeBench, APPS (add SWE-bench Verified) |
 | Chinese boost | C-Eval, CMMLU, AGIEval, SuperCLUE, self-built multi-turn / long-text |
 | Long-context boost | RULER, LongBench, InfiniteBench, Needle, self-built long-doc QA |
-| Tool / Agent prep | BFCL, τ-bench, ToolBench/StableToolBench, self-built API-call set |
+| Tool / Agent prep | BFCL, τ-bench, ToolBench/StableToolBench, self-built API-call set; agentic coding: SWE-bench Verified / Multilingual / Pro, Terminal-Bench, DeepSWE *after an identical short SFT* |
 | Domain boost | medical (HealthBench/MedQA), legal (LegalBench), finance (FinanceBench/FinQA) + private business set |
+
+**Short-fixed-SFT protocol for midtraining decisions** (Nemotron 3.5
+`[paper 2610.22019]` — the operational form of the Pareto rule above):
+
+1. Freeze one post-training recipe (Nemotron's agentic SFT settings are in
+   post-training.md §2) at two budgets — **short, 33B tokens**, for
+   decisions and **full, 100B** ("close to saturation") for headline
+   claims — and apply it identically to every candidate checkpoint *and*
+   to the stage-input base.
+2. Pin the agent evaluation: harness + version, rollouts, turn cap, and
+   sampling (theirs: SWE-bench via OpenHands SDK 1.17.0, 3 rollouts/task,
+   ≤200 turns or 250 for Pro; Terminal-Bench via Terminus-2, 8 rollouts,
+   1-hour cap; DeepSWE averaged over 4 runs; temperature 1.0, top-p 0.95).
+   Report pass@1 **and** pass@k from the same rollouts: a rising pass@k
+   means the model solves *more*, not just more reliably, and the paper
+   reads higher pass@k as more room for RL to improve (citing Yue et al.
+   2025). Compare Terminal-Bench only within a version — 2.1 fixed 28 of
+   2.0's 89 tasks.
+3. Run general-capability regression groups on the *base* checkpoints
+   during midtraining, against the stage input — knowledge (MMLU 5-shot +
+   MMLU-Pro 5-shot CoT), math (GSM8K 8-shot + MATH 4-shot), code
+   (HumanEval 0-shot + MBPP-Sanitized 3-shot), commonsense (ARC-Challenge,
+   HellaSwag, OpenBookQA, PIQA, WinoGrande). This is what exposed the
+   learning-rate damage (pretraining.md §4).
+4. Keep post-trainability proxies on the dashboard as trend lines
+   (Nemotron's: LoCoDiff over all 198 cases, greedy, 16K generation budget,
+   averaged over 3 runs; RepoBench cross-file-first edit similarity;
+   README-first, dependency-ordered repository BPB; trace BPB on the
+   *decisive* turns of DeepSWE trajectories with tool-call formatting
+   masked). They moved the right way every time and still did not decide
+   a single recipe choice.
+5. Log **context economy**: rollouts that end by filling the context window
+   or hitting the turn cap (their SWE-bench Pro: 91 → 13 of 2,193 rollouts
+   after 500B midtraining tokens). pass@1 hides this failure class.
+6. Budget noise honestly: single-run agentic comparisons move 1–2 points
+   run-to-run (≈1 on SWE-bench Verified/Pro, ≈2 on DeepSWE at 120B-A12B;
+   Terminal-Bench is noisier) — do not read a 1-point delta.
 
 ## 5. Post-training: SFT monitoring
 
@@ -157,7 +205,7 @@ refuses benign ones (over-refusal) has not been aligned, it has been crippled.
 | RL stability | reward, **KL to reference**, policy entropy, value loss, advantage mean/std, clip fraction | KL too high → model drifts; KL too low → learns nothing |
 | Reward hacking | reward ↑ but human eval ↓, answers grow longer, template-ization, sycophancy | the canonical post-training failure |
 | Safety | harmful compliance, jailbreak ASR, false refusal, policy-violation rate | safety and helpfulness must be watched together |
-| Tool / Agent | task success, invalid action, loop rate, timeout, error recovery, cost | agents are judged end-to-end, not per-call |
+| Tool / Agent | task success, invalid action, loop rate, timeout, error recovery, cost, **context-window-fill rate, turn-cap hits** | agents are judged end-to-end, not per-call; context economy is a capability pass@1 hides (§4) |
 | Product experience | TTFT, tokens/s, latency, cost, timeout, user satisfaction, complaint rate | the only tier that matters at release |
 
 The reward-hacking signature is **reward ↑ + KL ↑ + length ↑ together** — track
@@ -181,9 +229,9 @@ reward exists.
 | Dialogue quality | MT-Bench, MT-Bench-101, Arena-Hard, WildBench, AlpacaEval 2, human pairwise | win rate, judge score, Elo |
 | Factuality | SimpleQA, TruthfulQA, FActScore, self-built fact QA | correctness, incorrectness, not-attempted, unsupported claims |
 | Math / reasoning | MMLU-Pro, GPQA, BBH, MATH, AIME, OlympiadBench | accuracy, exact match, pass@k, maj@k |
-| Code | LiveCodeBench, HumanEval, MBPP, SWE-bench Verified | pass@1, resolved rate, unit-test pass |
+| Code | LiveCodeBench, HumanEval, MBPP, SWE-bench Verified / Multilingual / Pro, DeepSWE | pass@1 (mean over rollouts), pass@k, resolved rate, unit-test pass |
 | Tool use | BFCL | tool selection, schema match, argument accuracy, execution accuracy |
-| Agent | τ-bench, WebArena, GAIA, BrowseComp, self-built business tasks | task success, pass^k, step count, timeout, cost |
+| Agent | τ-bench, Terminal-Bench, WebArena, GAIA, BrowseComp, self-built business tasks | task success, pass^k, step count, timeout, cost, context-window-fill rate |
 | Long context | RULER, LongBench, InfiniteBench, Needle | accuracy by length, position sensitivity, effective context length |
 | Safety | HarmBench, JailbreakBench, AdvBench, SafetyBench, WMDP, XSTest, internal red team | harmful compliance, jailbreak ASR, false refusal |
 | RAG | self-built evidence set, FreshQA-style | answer correctness, groundedness, citation precision/recall |
@@ -247,7 +295,7 @@ for their stage. These are the floor, not the ceiling.
 | Target domain | target held-out loss + target benchmark |
 | General retention | MMLU-Pro, C-Eval, CMMLU, GSM8K, HumanEval |
 | Math | MATH-500, AIME, GPQA |
-| Code | LiveCodeBench, SWE-bench Verified |
+| Code | LiveCodeBench; agentic prep: SWE-bench Verified / Multilingual, Terminal-Bench after an identical short SFT (§4) |
 | Long context | RULER, LongBench, Needle |
 | Tool / Agent | BFCL, τ-bench, self-built tool-call set |
 | Safety regression | HarmBench subset, false-refusal set, internal red team |
@@ -308,3 +356,9 @@ Honesty rules specific to evaluation:
   version change moving a baseline from 81.2 to 32.53 on τ²-bench `[paper
   2606.30616]`. Leaderboard tables also often mix protocols (official
   numbers where available, re-runs elsewhere) — say which is which.
+  Harness choice also changes the *size* of a training effect: the same
+  65B-token midtraining of Nemotron 3.5 Super gained +3.4 (Hermes) to
+  +13.4 (Codex) SWE-bench Verified points depending on the harness,
+  largest where the base was weakest — sweep several harnesses when the
+  model will be used in many, and never compare numbers across harnesses
+  `[paper 2610.22019]`.

@@ -276,7 +276,7 @@
 // DATA — the only block to edit when facts change (docs/conventions.md).
 // ============================================================================
 const DATA = {
-  updated: "2026-09-07",
+  updated: "2026-10-27",
   repo: "https://github.com/voidful/AlchemistPlaybook",
   stats: [
     { v: "auto:sources", k: "sources in the bibliography" },
@@ -289,14 +289,14 @@ const DATA = {
   ],
   routing: [
     { topic: "Text-LLM baseline — starting config, peak LR by size, cross-stage comparison", file: "text-llm-baselines.md" },
-    { topic: "Pretraining from scratch — schedules (cosine/WSD), batch ramp, data mixes, midtraining/annealing, distillation, curriculum, edge architectures", file: "pretraining.md" },
+    { topic: "Pretraining from scratch — schedules (cosine/WSD), batch ramp, data mixes, midtraining/annealing (incl. 256K agentic midtraining), distillation, curriculum, edge architectures", file: "pretraining.md" },
     { topic: "Post-training — SFT, DPO, SimPO, ORPO, KTO, PPO, GRPO, RLVR, reward models, model merging", file: "post-training.md" },
     { topic: "Stability — loss spikes, NaN, divergence, grad-norm anomalies, precision, QK-norm, z-loss, MuonClip", file: "stability.md" },
     { topic: "PEFT — LoRA, QLoRA, low-budget fine-tuning", file: "peft.md" },
     { topic: "Speech — ASR, speech translation, SSL, Whisper/OWSM, ESPnet", file: "speech.md" },
     { topic: "Scaling — compute/token budgets, Chinchilla, critical batch size, LR–batch coupling, muP, MFU", file: "scaling-and-batch.md" },
     { topic: "Diagnostics — symptom → cause → fix, monitoring setup, pre-launch checklist", file: "diagnostics.md" },
-    { topic: "Evaluation — per-stage metrics and benchmarks, three-tier framework, retention suite, release gate", file: "evaluation.md" },
+    { topic: "Evaluation — per-stage metrics and benchmarks, three-tier framework, retention suite, midtraining decision protocol, release gate", file: "evaluation.md" },
     { topic: "Experiment records — existing trackers, optional HTML dashboards, git checkpoints, authorized publishing", file: "experiment-tracking.md" },
     { topic: "Bibliography with verification status", file: "sources.md" }
   ],
@@ -368,6 +368,7 @@ const DATA = {
     { n: "GLM-5", id: "2602.15763", a: "Pretraining", v: "paper", u: "744B/40B MoE; Muon Split; DSA sparse-attention retrofit; INT4 QAT" },
     { n: "EvoLM", id: "2506.16029", a: "Pretraining", v: "config", u: "Full-pipeline ablation, 100+ models; downstream saturation ~80–160 tok/param" },
     { n: "MiniCPM5-1B", id: "OpenBMB/MiniCPM", a: "Pretraining", v: "paper", u: "Staged-decay curriculum 4K/200B→32K/75B→128K/25B; parallel RL teachers → OPD; +16 avg over SFT at 1B", link: "https://github.com/OpenBMB/MiniCPM" },
+    { n: "Nemotron 3.5 agentic midtraining (NVIDIA)", id: "2610.22019", a: "Pretraining", v: "paper", u: "Open 256K agentic-coding midtraining: 75% natural SWE data + 20% replay + 5% long-context, traces capped 10–15%, tool responses masked, constant moderate LR; decide recipes by short fixed SFT, not base-model proxies" },
     { n: "Zephyr", id: "2310.16944", a: "Post-training", v: "config", u: "SFT 2e-5 / cosine / 1 ep; DPO 5e-7, β 0.01, 1 ep" },
     { n: "Tulu 3", id: "2411.15124", a: "Post-training", v: "config", u: "SFT 5e-6; length-norm DPO β5, 5e-7; full RLVR PPO table (3e-7)" },
     { n: "DPO", id: "2305.18290", a: "Post-training", v: "paper", u: "β 0.1 convention; objective" },
@@ -416,6 +417,11 @@ const DATA = {
     { n: "SWE-bench (Verified)", id: "2310.06770", a: "Benchmarks", v: "paper", u: "Repo-level resolved rate" },
     { n: "LiveCodeBench", id: "2403.07974", a: "Benchmarks", v: "paper", u: "Contamination-resistant, time-windowed code eval" },
     { n: "AlpacaEval 2 / Arena-Hard / MT-Bench", id: "2404.04475", a: "Benchmarks", v: "paper", u: "LLM-judge win-rate / Elo (relative, judge-dependent)" },
+    { n: "Terminal-Bench", id: "2601.11868", a: "Benchmarks", v: "paper", u: "CLI-agent tasks (89); compare only within a version (2.0 vs 2.1)" },
+    { n: "SWE-bench Multilingual / Pro", id: "2504.21798", a: "Benchmarks", v: "paper", u: "Multilingual and long-horizon repo-level resolution; Pro concentrates context-window-fill failures" },
+    { n: "DeepSWE", id: "2607.07946", a: "Benchmarks", v: "paper", u: "Original long-horizon engineering tasks; ≈2-point run-to-run noise" },
+    { n: "LoCoDiff / RepoBench", id: "2306.03091", a: "Benchmarks", v: "reported", u: "Base-model post-trainability trend metrics — improve with midtraining, do not predict post-SFT results", link: "https://abanteai.github.io/LoCoDiff-bench/" },
+    { n: "BrowseComp", id: "2504.12516", a: "Benchmarks", v: "paper", u: "Browsing-agent benchmark" },
     { n: "Eric Provencher: Rethinking skills and prompts for GPT-6 Astra", id: "X article", a: "Workflow", v: "reported", u: "Concise discovery and task-specific reference loading; workflow guidance, not training evidence", link: "https://x.com/pvncher/status/2095991462416490862" },
     { n: "OpenAI: Using GPT-6 Astra", id: "official guide", a: "Workflow", v: "reported", u: "Instruction scope, task completion, response format, and proportionate verification; not training evidence", link: "https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra" },
     { n: "HTML-artifact workflow (Anthropic blog)", id: "claude.com", a: "Workflow", v: "reported", u: "Optional HTML reporting workflow — never cited for hyperparameters", link: "https://claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html" },
@@ -432,6 +438,7 @@ const DATA = {
     { id: "0006", d: "2026-09-07", t: "Task-scoped guidance and progressive disclosure", p: "Short trigger, routed baselines, context-aware intake, user-selected formats, and proportionate verification. New behavior evals await execution.", f: "0006-task-scoped-skill-guidance.md" }
   ],
   commits: [
+    { d: "2026-10-27", s: "Add Nemotron 3.5 agentic midtraining recipe (arXiv 2610.22019): 256K SWE blend, traces ≤10–15%, tool-response masking, LR/replay ablations, short-fixed-SFT decision protocol" },
     { d: "2026-08-19", s: "Add MiniCPM5-1B, OpenThoughts, GRAPE: reasoning-SFT data curation, RL length-control guardrail, 1B RL-teachers→OPD" },
     { d: "2026-08-19", s: "Add Rethinking-OPD: OPD preconditions, overlap-ratio diagnostic, cold-start recovery" },
     { d: "2026-08-19", s: "Adopt two-road living documentation (decision 0004)" },

@@ -2,10 +2,11 @@
 name: alchemist-playbook
 description: >-
   Evidence-based model-training recipes and run diagnosis (煉丹調參).
-  Use for pretraining, SFT, preference tuning, RLVR, LoRA/QLoRA, or speech
-  training; training hyperparameters, loss spikes, data curation, compute
-  budgets, stage evaluation, and experiment reports. Pure inference setup
-  or general prompt writing is outside this skill's scope.
+  Use for pretraining, midtraining, SFT, preference tuning, RLVR,
+  LoRA/QLoRA, or speech training; training hyperparameters, loss spikes,
+  data curation, compute budgets, stage evaluation, and experiment reports.
+  Pure inference setup or general prompt writing is outside this skill's
+  scope.
 ---
 
 # Alchemist Playbook
@@ -86,14 +87,14 @@ checklist. Use multiple routes when the problem crosses topics.
 | Topic | File |
 | --- | --- |
 | Text-LLM starting config, consensus baseline, peak LR by size, cross-stage LR comparison | `references/text-llm-baselines.md` |
-| Pretraining, cosine/WSD, batch ramp, data mixes, midtraining/annealing, distillation, curriculum, edge architectures | `references/pretraining.md` |
+| Pretraining, cosine/WSD, batch ramp, data mixes, midtraining/annealing (incl. 256K agentic midtraining), distillation, curriculum, edge architectures | `references/pretraining.md` |
 | SFT, DPO, SimPO, ORPO, KTO, PPO, GRPO, RLVR, reward models, model merging, reasoning-data curation | `references/post-training.md` |
 | Loss spikes, NaN, divergence, grad norms, precision, QK-norm, z-loss, MuonClip | `references/stability.md` |
 | LoRA, QLoRA, low-budget fine-tuning | `references/peft.md` |
 | ASR, speech translation, speech SSL, Whisper/OWSM, ESPnet | `references/speech.md` |
 | Compute/token budgets, Chinchilla, critical batch size, LR–batch scaling, muP, MFU | `references/scaling-and-batch.md` |
 | Symptom → cause → fix, monitoring setup, pre-launch checks, incomplete logs | `references/diagnostics.md` |
-| Per-stage metrics and benchmarks, retention suites, independent release gates | `references/evaluation.md` |
+| Per-stage metrics and benchmarks, retention suites, midtraining decision protocol, independent release gates | `references/evaluation.md` |
 | Experiment records, optional HTML dashboards, git checkpoints, publishing an authorized report | `references/experiment-tracking.md` |
 | Bibliography and verification status, including workflow-only sources | `references/sources.md` |
 

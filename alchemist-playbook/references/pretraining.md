@@ -35,6 +35,7 @@ Verification tags: `[config]` = read from official config/model card,
 | LFM2 dense `[paper]` | 0.35–2.6B | 10T + 1T mid | not disclosed (distillation-driven) | — | accel. decay in midtrain | — | 4096 → 32768 | AdamW (0.9,0.95) wd 0.1 clip 1.0; hybrid gated short-conv + GQA (6–8 attn of 16–30 layers); distilled from LFM1-7B; ~10% input dropout; see §6 |
 | LFM2-8B-A1B MoE `[paper]` | 8B (1B active) | 12T + 1T mid | not disclosed | — | accel. decay in midtrain | — | 4096 → 32768 | 32 experts/layer, top-4; same hybrid backbone; edge/on-device target |
 | GLM-5 `[paper]` | 744B MoE (40B active) | 28.5T total = 27T pre + 1.55T mid + 20B DSA adapt | not disclosed (Muon family) | — | — | — | 4K → 200K | 256 experts, 80 layers (fewer layers to cut EP comm); MLA-256 (head dim 192→256, heads −1/3 for cheap decoding); Muon **Split** (stability.md §5); MTP with 3 parameter-shared layers (accept len 2.76); DSA sparse-attention retrofit (§7); INT4 QAT during SFT |
+| Nemotron 3.5 agentic midtrain — stage only `[paper 2610.22019]` | 30B-A3B (Lightning) / 120B-A12B (Super) MoE | up to 500B / 65–280B midtrain tokens on a converged base | 5e-5 / 1e-5 | 32K / 30K sequences (≈500 steps at batch 64) | **constant** after warmup — no decay inside the stage | 64 seqs × 256K ≈ 16.8M tokens | 262,144 packed, inter-document masking | Adam (0.9, 0.95), wd 0.1, clip 1.0, BF16, 2 MTP layers kept (loss weight 0.1 / 0.3), 20% pretraining replay; pretraining LRs are not in this paper; recipe + ablations in §4 |
 | EvoLM `[config]` | 0.5/1/4B | 10–320B (swept) | 2.5e-4 / 2e-4 / 1.5e-4 | ratio 0.1 | cosine → 10% | 512 seqs (0.5/1B) / 1024 (4B) × 2048 ≈ 1–2M tokens | 2048 | AdamW (0.9,0.95) wd 0.1 clip 1.0, bf16-mixed, FineWeb-Edu; 100+-run controlled full-pipeline ablation (LLaMA arch, GQA 4 groups); downstream saturation ~80–160 tok/param (scaling-and-batch.md §1); CPT replay ablation in §4 |
 
 Cross-checks worth quoting: tokens-per-parameter ranges from Chinchilla-optimal
@@ -151,15 +152,144 @@ homogeneous phase.
   21.01 vs 19.27 / 16.21 / 15.22). More replay is not automatically safer —
   it displaces target-domain tokens.
 
+**Agentic-coding midtraining — the Nemotron 3.5 open recipe** `[paper
+2610.22019, v1 2026-10-15]`. A dedicated stage between a converged
+short-context base (Nemotron pretrains at 8K and sees almost no agent
+interactions) and SFT (mostly synthetic chat; very long SFT stages erode
+later RL trainability — the team's own observation, citing Liu 2026b /
+Kang 2025 / Zhang 2026 `[reported via the paper]`). It trains at **256K**
+context for 65–500B tokens so whole repositories, commit histories, and
+long agent traces fit in one sequence; learning that would otherwise
+inflate SFT moves here, so SFT stays short (33–100B tokens). Developed on
+Nemotron 3.5 Lightning-30B-A3B, then scaled to Super-120B-A12B.
+
+*Blend by share of training tokens* (Table 1; ≈380B unique natural tokens,
+so a 500B run sees each natural source about once):
+
+| Source | Unique tokens | Share | Epochs @500B |
+| --- | --- | --- | --- |
+| Issue–PR — merged PRs with linked issues, review discussion, and observed patch evolution; 12.1M PRs from ≥10-star repos; an LLM judge checks issue↔patch match with seven failure modes (revert, incidental link, wrong issue, partial fix, no clear action, underspecified, PR does far more); PR-only examples drop README-only or ≤3-line changes | 216.9B | 40.8% | 0.95 |
+| Repositories — only import-graph-*connected* repos (≥20% of code files import another file in the repo; 10% for Ruby); README first, then depth-first over the import graph so dependent files sit together; long repos split between connected components rather than truncated; >2M-token repos dropped; Python upweighted 23.5% → 31% | 104.1B | 20.0% | 0.97 |
+| Agentic traces — >1M trajectories, ~500K distinct queries, 30M tool calls from >10 scaffolds (Codex 19%, OpenHands 14%, Gemini CLI 12%, Terminus 12% …); the best trajectories are *reserved for SFT*, midtraining gets the rest incl. older-teacher traces; the only source rendered in the chat template | 39.4B | 10.0% | 1.28 |
+| Diff data — multi-file edits (import-linked files before → after a merged PR) and code-evolution documents (initial file → real commits oldest-to-newest → final state; median 3 / max 59 commits, median ≈6K tokens) | 16.0B | 3.0% | 0.95 |
+| Build & CI logs — LogHub archives + GitHub Actions run logs / workflow histories cut into 120 context lines → 16 target lines, plus 632 frontier-model-written diagnoses | 6.5B | 1.2% | 0.95 |
+| Pretraining replay — the base model's final-phase blend | ~2.0T | 20.0% | 0.05 |
+| Long-context data | 67.4B | 5.0% | 0.37 |
+
+Traces are deliberately capped at **10–15%** of the blend — more would turn
+the stage into a long SFT and risk the RL-trainability loss above.
+Everything but traces stays in natural format with no chat template.
+Hygiene applied to every source: permissive licenses only; decontamination
+against SWE-bench and Terminal-Bench (diff data also removes SWE-bench
+Verified/Pro, Multi-SWE-bench, Terminal-Bench, and LoCoDiff repositories;
+repositories drop files containing HumanEval / MBPP / LiveCodeBench
+solutions); secret redaction; and **loss-masking of anything the model
+should condition on but not imitate** — file-path headers, diff headers,
+commit hashes, authors, dates, timestamps, repeated delimiters, license
+blocks. Trace filtering removes solution leakage through git history or
+web lookup, unfinished runs, malformed tool calls, and repetitive
+file-inspection loops (≈1% of an early snapshot).
+
+*Training* (§1 row; Table 17): 256K packed sequences with inter-document
+masking, batch 64 sequences, a short warmup, then a **constant** LR — 5e-5
+on the 30B-A3B ("favors agentic gains") and 1e-5 on the 120B-A12B ("favors
+preserving general capabilities"); both keep their MTP layers; Megatron-LM
+on GB300. In a mature pipeline the stage sits **before the final
+long-context stage**; for evaluation simplicity most runs here started
+from the 1M long-context checkpoint instead.
+
+*Ablations worth transferring* (all measured after *identical* SFT; single
+runs):
+1. **Traces carry most of the post-SFT gain.** 100B tokens on the 30B-A3B:
+   natural data alone gave +0.8 SWE-bench Verified pass@1 after full SFT
+   (59.7 → 60.5) and a Terminal-Bench *regression* (22.9 → 18.5); the full
+   blend gave +3.8 (63.5) and +2.2 (25.1). Natural data still earns its
+   75%: it drives file-state tracking (LoCoDiff exact match 1.3% → 29.8%
+   from diff data alone in a 10B-token comparison), cross-file modeling,
+   and harness robustness.
+2. **Mask tool responses; train on assistant turns and tool calls.**
+   Putting environment outputs in the loss cost ≈10 points of SWE-bench
+   Verified pass@1 (27.5 vs 37.8; pass@3 41.6 vs 53.0) — long, noisy file
+   dumps and test logs take capacity from the agent's own actions.
+3. **Replay 20%**: no general-capability regression through 65B tokens on
+   the 120B-A12B (knowledge / math / code / commonsense groups all within
+   1.2 points of the stage input); **40% replay gave no clear benefit**.
+4. **LR**: a moderate increase over the decayed end-of-pretraining LR,
+   tuned against the general-capability groups — the Table 11 sweep is in
+   the continued-pretraining guidance below. The 30B-A3B kept 5e-5 anyway,
+   trading general capability for agentic gains.
+5. **Midtraining doubles as a long-context stage.** From the 8K base, 100B
+   tokens at 256K alone landed within ≈5 RULER points of the dedicated
+   long-context model up to 128K (14 behind at 256K); midtrain → long-
+   context then **beat** long-context-only at every length from 64K to
+   256K (86.6 / 83.8 / 79.7 vs 85.9 / 81.3 / 76.6). Ordering matters the
+   other way too: midtraining a 1M checkpoint at 256K dropped RULER@1M
+   79.9 → 33.0 within 25B tokens, and a ≈9B-token long-context-only
+   touch-up restored 81.0 — training past the target length helps at the
+   target (GLM-5's 200K finding above) and training *below* it hurts until
+   you re-extend.
+
+*What it bought* (identical full SFT, 100B tokens): 30B-A3B at 500B
+midtrain tokens — SWE-bench Verified 60.7 → 64.5, Multilingual 55.8 →
+62.8, Pro 32.0 → 35.5, Terminal-Bench 2.0 22.6 → 23.6, with pass@k up
+2.3–4.7 points on all four (it solves *more*, not just more reliably);
+most of the Verified/Pro gain had arrived by 100B, Multilingual kept
+climbing to 500B, Terminal-Bench is noisy and peaked at 300B. 120B-A12B at
+280B tokens — DeepSWE 11.7 → 15.7, Verified 72.9 → 74.3, BrowseComp +3;
+Multilingual/Pro −1.1 / −2.1, which the authors treat as noise (run-to-run
+≈1 point on Verified/Pro, ≈2 on DeepSWE). Every agent harness improved on
+both models (mean +8.6 Verified / +6.8 Terminal-Bench on the 120B after
+short SFT; +11.6 Verified across six harnesses on the 30B), with the
+largest gains where the base was weakest. The agent also became more
+economical with context: SWE-bench Pro rollouts that failed by filling the
+256K window fell 91 → 13 of 2,193 (4.1% → 0.6%), turn-cap hits on Verified
+11 → 1. A 20-step GRPO check kept the ≈2-point Verified lead and held
+Terminal-Bench pass@8 where the base's fell (post-training.md §5).
+
+*Honesty notes*: every comparison is a single run (1–2-point differences
+are within noise, Terminal-Bench especially); there is no equal-token
+comparison against longer pretraining or longer SFT; Nemotron models only,
+agentic coding only; the pretraining peak LR is not in this paper, so
+"moderate increase" is relative to the decayed end-of-pretraining LR; data
+scripts and training-set metadata were "planned for a future version" at
+v1. Context from the paper's related work `[reported — not independently
+verified here]`: Qwen3-Coder-Next midtrains at 256K on trillions of tokens
+incl. 600B repository-level tokens across 370 languages; Kimi-Dev uses
+≈150B tokens of diff patches, commit sequences, and synthetic agent
+interactions and then needs far fewer SFT tokens; daVinci-Dev matches it
+with trajectory-style data at under half the tokens; GLM-5's ≈160B SWE
+tokens are the bullet above. How to *judge* such a stage: evaluation.md §4.
+
 Recipe guidance when a user asks "should I add my domain data during
 pretraining?": put small, high-quality, capability-targeted data in a
 **late anneal stage with decaying LR**, not uniformly through the run.
 For continued-pretraining of an existing base: 10–100B tokens with a fresh
-warmup and cosine/WSD decay, mixing original-distribution replay to limit
-forgetting — EvoLM's controlled point above says ~5–15% replay, tuned, and
-warns against reflexively going higher; the older 10–30% band from OLMo 2
-stage-2 / Llama 3 anneal practice is the upper limit, not the default
-`[EvoLM config-verified; band remains heuristic]`.
+warmup and cosine/WSD decay — or, when a long-context stage and SFT still
+follow, a short warmup to a **constant** moderate LR with no decay inside
+the stage (Nemotron 3.5 midtraining `[paper]`, 65–500B tokens) — mixing
+original-distribution replay to limit forgetting. Two controlled replay
+points: EvoLM (1B dense, 50B math CPT) says ~5–15% replay, tuned, and
+warns against reflexively going higher; Nemotron (30B-A3B / 120B-A12B MoE,
+agentic midtraining) ran **20%** with no general-capability regression
+through 65B tokens and found **40% no better** `[paper]`. The older 10–30%
+band from OLMo 2 stage-2 / Llama 3 anneal practice is the upper limit, not
+the default `[EvoLM config-verified; Nemotron paper; band remains
+heuristic]`.
+
+**CPT learning rate — two published regimes, not one rule.** EvoLM
+re-warmed a small dense base to its *full* pretraining peak (2e-4).
+Nemotron, starting from a converged large MoE whose pretraining ended at a
+small decayed LR, used only a *moderate* increase and showed why `[paper —
+Table 11, 30B-A3B, 100B tokens, 20% replay]`: against the stage input
+(MMLU 79.4 / MMLU-Pro 64.3 / MATH-500 79.7), a constant 1e-5 landed at
+78.5 / 66.3 / 78.8, warming up to 3e-5 at 76.7 / 61.5 / 74.3, and 5e-5 at
+76.8 / 63.3 / **61.7** — an 18-point MATH-500 loss that replay did not
+prevent — even though 1e-5 had given smaller post-SFT agentic gains in
+their early runs. `[heuristic]` When preserving general capability is a
+hard constraint on a large converged base, start in the 1e-5 class and
+raise only while the general-capability groups hold; when the base is small
+and the CPT domain is the whole goal, EvoLM's full re-warm is the published
+pattern.
 
 **Evaluating a midtraining/anneal stage is a Pareto problem, not a single
 number.** The success criterion is `target capability ↑ − general capability
@@ -169,6 +299,12 @@ tool use is a *failure* even if the target benchmark rose. Every midtraining
 run must own a fixed **retention suite** (general knowledge + Chinese + math +
 code + long-context + safety + target domain) measured against the *stage
 input* checkpoint. Catalog and minimal mid-training suite: `references/evaluation.md` §4.
+For agentic midtraining the Nemotron protocol is the operational form of
+this rule: identical short SFT after every candidate checkpoint as the
+decision signal, general-capability groups as regression checks, and
+base-model proxies (bits-per-byte, LoCoDiff, RepoBench) only as trend
+monitors — they rose monotonically yet did not predict post-SFT results
+`[paper 2610.22019]`.
 
 Note this section reorders **domains** over the run. Reordering **individual
 examples** by measured difficulty is a separate, composable lever — see §6.

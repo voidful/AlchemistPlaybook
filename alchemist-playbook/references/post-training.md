@@ -45,6 +45,7 @@ report, `[reported]` secondary source.
 | Same instructions exist with several candidate responses (multiple datasets/teachers) | GRAPE (§16): keep the lowest-base-model-perplexity response, then plain SFT | beats picking the strongest teacher's answers on every base tried |
 | Picking (or debugging) an OPD teacher for a single student | Check the two preconditions first (§15) | Rethinking-OPD: pattern-mismatched or same-pipeline teachers fail even when they benchmark higher — OPD is reverse KL at *student-visited* states, so the teacher must differ there |
 | Agentic RL where sparse episode rewards leave intermediate decisions unguided, and no stronger teacher exists | Self-evolving hindsight-skill OPD joint with GRPO (SEED, §17) | dense token-level signal from the policy's *own* trajectory analysis; beats GRPO on ALFWorld/WebShop/search-QA at 1.7–7B |
+| Agentic-coding post-training on a base that pretrained at short context with no agent traces; SFT keeps growing to compensate and later RL gains shrink | Insert a 256K **agentic midtraining** stage before SFT (pretraining.md §4, Nemotron 3.5) and keep SFT short | +3.8 SWE-bench Verified / +7.0 Multilingual / +3.5 Pro after identical SFT at 30B-A3B; traces capped at 10–15% of the blend so the stage does not become a long SFT; tool responses masked |
 
 ## 2. SFT recipes
 
@@ -60,6 +61,7 @@ report, `[reported]` secondary source.
 | Agents-A1 full-domain SFT | Qwen3.5-35B-A3B | 1e-5 | cosine + warmup | ratio 0.05 | 1 | 16 seqs | 131072 | `[paper]` Table 3; wd 0.1, response-token loss only, sample packing; ~100K agent trajectories avg 45K tokens |
 | OpenThinker3-7B (reasoning distillation) | Qwen2.5-7B-Instruct | 8e-5 | cosine | ratio 0.1 | 5 | 512 seqs | not stated | `[config]` HF model card + paper App. D Table 9; AdamW (0.9, **0.999**), wd 0, packing; 1.2M QwQ-32B traces (§16) |
 | GRAPE-curated SFT | Llama3.1-8B / Qwen2.5-7B / Mistral-7B | 1e-5 | — | — | 1 | 256 | — | `[paper]` App. D; batch 256, micro 2; data = lowest-base-model-perplexity responses (§16) |
+| Nemotron 3.5 agentic SFT (midtraining eval protocol) | N-3.5 Lightning-30B-A3B / Super-120B-A12B, base or midtrained | 2e-5 | cosine → 5e-6 | — | 33B tokens (short) / 100B (full) | 64 seqs | 262144 | `[paper 2610.22019]` Table 17; Adam (0.9, 0.95), wd 0.1, clip 1.0; ~430K trajectories from several scaffolds, mostly GLM-5.2-generated; assistant turns + tool calls in the loss, tool responses masked |
 
 Rules that matter more than the LR:
 
@@ -88,6 +90,22 @@ Rules that matter more than the LR:
   mistakes and the recovery that follows, learning self-correction without
   ever being trained to reproduce the mistake. Generalizes the prompt-mask
   rule: loss-mask anything you want conditioned on but not imitated.
+- **Mask tool responses; train on tool calls** (Nemotron 3.5 `[paper
+  2610.22019]`): including environment outputs (file dumps, test logs,
+  tracebacks) in the loss cost ≈10 SWE-bench Verified pass@1 points after
+  identical SFT (27.5 vs 37.8) in a 100B-token midtraining ablation —
+  predicting noisy tool output takes capacity from the agent's own
+  actions. Same rule GLM-5 applies in RL (§11). The *world-model* line of
+  work that trains on tool responses on purpose (CWM, daVinci-Dev) did not
+  work "out of the box" for them — treat it as a separate recipe, not a
+  default.
+- **SFT length trades against RL plasticity.** The Nemotron team reports
+  (and cites Liu 2026b, Kang 2025, Zhang 2026 for) very long SFT stages
+  reducing later RL gains `[paper 2610.22019; the cited works are not
+  independently verified here]`; EvoLM's epoch sweep above is the
+  controlled version. Their structural answer: move long-context and
+  agent-format exposure into a midtraining stage with traces capped at
+  10–15% of the blend, so SFT stays at 33–100B tokens (pretraining.md §4).
 - **Scale SFT hyperparameters with dataset size, not just model size.**
   OpenThoughts' scale-dependent ladder `[paper — App. D Table 9]`, used
   across their 1000+ reasoning-SFT runs on a 7B: <1K samples → LR 1e-5, batch 32, 13 epochs;
@@ -269,6 +287,25 @@ general lesson for any RL stack: every stochastic/kernel-level divergence
 between rollout engine and trainer (top-k ties, tokenization round-trips,
 precision) is a latent RL killer — see also TITO in §11.
 
+**Nemotron 3.5 short RLVR persistence check (GRPO, settings stated)**
+`[paper 2610.22019, App. D]`: 20 GRPO steps with a **leave-one-out
+baseline and no reference-policy KL**, 256 prompts × 16 generations per
+step, 32K-token output cap inside a 131K context, LR 1e-6 with 10 warmup
+steps, prompts from 14 verifiable environments (tool use, code, SWE and
+search pivots, instruction following, reasoning, formatting). The part to
+copy is prompt selection: the seed blend was **reward-profiled against both
+starting checkpoints and only prompts with mixed rewards for each were
+kept** — the offline cousin of the pivot / MGPO / DAPO mixed-outcome
+filters, applied before training so neither model sees trivial or
+unsolvable prompts. Used only to ask whether a midtraining advantage
+survives the start of RL: it did (≈+2 SWE-bench Verified held at every
+step; the base's Terminal-Bench 2.1 pass@8 fell 46.1 → 39.3 while the
+midtrained model's held at 45–46), and training-time signals favored the
+midtrained start (+4.3% mean reward, 12% shorter generations, ≈10× fewer
+format violations, ≈15% faster per trajectory). Single seed, 20 steps —
+**not** evidence that midtraining raises RL headroom, and the authors say
+so.
+
 RL guardrails: monitor KL to reference, mean reward, and response length
 together — reward↑ + KL↑ + length↑ is the hacking signature. Penalize
 missing EOS (Tulu 3's −10) to prevent run-on generations.
@@ -302,6 +339,7 @@ README), nor is the repetition-penalty coefficient.
 | Reward climbing but a large share of responses hit the max-token cap | no length shaping under a hard cap — model generates until truncation instead of committing | repetition penalty + staged max-length schedule (MiniCPM5 30,720→38,912, §5); Long2Short brevity reward λ=0.2 (§10) |
 | Multi-domain agent SFT regresses IF / general QA | conflicting reasoning patterns in one SFT mix (single-turn long-thinking vs multi-turn tool-use) | domain teachers + multi-teacher OPD (§13, Agents-A1) |
 | OPD loss falls but student benchmarks flat despite a stronger teacher | teacher fails an OPD precondition: thinking-pattern mismatch, or same-pipeline teacher with nothing new at student-visited states | check top-k overlap ratio + entropy gap; swap teacher, or off-policy cold start + teacher-aligned prompts (§15, Rethinking-OPD) |
+| Coding agent fills the context window or hits turn caps; longer SFT barely moves SWE-bench | base pretrained at short context with no agent traces — SFT alone cannot supply repository-scale context use | 256K agentic midtraining with masked tool responses before SFT (pretraining.md §4): SWE-bench Pro context-fill failures 4.1% → 0.6%, turn-cap hits 11 → 1, Verified +3.8 after identical SFT |
 
 ## 7. Evaluation discipline
 

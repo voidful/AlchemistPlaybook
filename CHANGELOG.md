@@ -5,6 +5,41 @@ listed separately in each entry. The version here must match
 `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`
 (locked by `tests/test_doc_consistency.py`).
 
+## 1.3.0 — Nemotron 3.5 agentic midtraining recipe
+
+Knowledge:
+
+- Add "Priming Base Models for Agentic Post-Training: An Open Midtraining
+  Recipe" (NVIDIA, arXiv 2610.22019). `pretraining.md` §1 gains a
+  stage-only row and §4 a full agentic-coding midtraining entry: the 256K
+  blend (natural software-engineering data, pretraining replay,
+  long-context data; agentic traces capped at a small share), per-source
+  construction and loss-masking rules, the constant-LR training setup, and
+  the ablations on traces, tool-response masking, replay share, learning
+  rate, and stage ordering relative to long-context extension. The
+  continued-pretraining guidance now states two learning-rate regimes
+  (EvoLM full re-warm vs Nemotron moderate constant LR) and two controlled
+  replay points.
+- `evaluation.md`: a fourth eval rule and a §4 short-fixed-SFT decision
+  protocol — base-model proxies (bits-per-byte, LoCoDiff, RepoBench) trend
+  but do not decide; pinned harness settings, pass@k reporting,
+  general-capability regression groups, context-economy failures, and
+  run-to-run noise budgets; harness-dependence note in §9.
+- `post-training.md`: chooser row for agentic midtraining, the Nemotron
+  agentic SFT settings, tool-response-masking and SFT-length-vs-RL rules,
+  the 20-step GRPO persistence check with its mixed-reward prompt filter,
+  and a failure-mode row. `diagnostics.md`: two symptom rows (general
+  benchmarks sagging under a too-high midtraining LR; context-window-fill
+  agents). Bibliography rows for the paper and for Terminal-Bench,
+  SWE-bench Multilingual/Pro, DeepSWE, LoCoDiff/RepoBench, BrowseComp.
+
+Packaging:
+
+- `midtraining` added to the trigger description; routing rows for
+  `pretraining.md` and `evaluation.md` name the new coverage; dashboard
+  DATA block (sources, routing, timeline) updated; archive rebuilt;
+  version 1.3.0 in both plugin manifests.
+
 ## 1.2.0 — task-scoped guidance and progressive disclosure
 
 Skill behavior:
