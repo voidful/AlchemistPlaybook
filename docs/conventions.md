@@ -2,7 +2,7 @@
 type: conventions
 title: Documentation and content conventions
 status: active
-updated: 2026-09-07
+updated: 2026-10-27
 ---
 
 # Conventions
@@ -13,7 +13,11 @@ Every concrete value in `alchemist-playbook/` carries exactly one marking.
 Definitions live in [glossary.md](glossary.md); the authoritative statement
 is `references/sources.md` header. In short: `[config]` > `[paper]` >
 `[reported]`, and anything unbacked is `[heuristic]`. A number with no
-marking cannot merge (constitution invariant 6).
+marking cannot merge (constitution invariant 6). Values read from a
+third-party repository (configs, step manifests) are `[config]` only
+together with the repository, path, and pinned commit they were read from;
+README, guide, FAQ, and guidebook statements are `[reported]`
+([decision 0007](decisions/0007-nemo-stack-default-implementation.md)).
 
 ## Reference-file structure
 

@@ -5,8 +5,10 @@ description: >-
   Use for pretraining, midtraining, SFT, preference tuning, RLVR,
   LoRA/QLoRA, or speech training; training hyperparameters, loss spikes,
   data curation, compute budgets, stage evaluation, and experiment reports.
-  Pure inference setup or general prompt writing is outside this skill's
-  scope.
+  Default implementation stack: NVIDIA NeMo (Nemotron recipes and steps,
+  NeMo-RL, NeMo Gym environments); also use when the user mentions NeMo
+  Gym, Nemotron, NeMo-RL, or Megatron-Bridge configs. Pure inference setup
+  or general prompt writing is outside this skill's scope.
 ---
 
 # Alchemist Playbook
@@ -27,6 +29,13 @@ from observations about the user's run and from proposed experiments.
   defaults. Existing authorization persists; host permissions and required
   repository checks still apply. Prepare useful local work while any
   necessary approval for a training launch or publication remains pending.
+- Implement on the NVIDIA NeMo stack by default: when no trainer is fixed,
+  or the user asks how to run, launch, or evaluate a recipe, map it onto
+  Nemotron steps and recipes (Megatron-Bridge, NeMo AutoModel, NeMo-RL) and
+  NeMo Gym environments, with the config keys in
+  `references/nemo-stack.md`. Keep a user's existing trainer; name the NeMo
+  equivalent only where it adds a capability the current stack lacks.
+  Verify paths and flags against the live checkout before emitting them.
 - If an instruction here blocks the task, identify the exact skill or
   reference file, quote the applicable instruction, and explain the missing
   decision. Do not turn a preferred workflow into an approval requirement.
@@ -96,6 +105,7 @@ checklist. Use multiple routes when the problem crosses topics.
 | Symptom → cause → fix, monitoring setup, pre-launch checks, incomplete logs | `references/diagnostics.md` |
 | Per-stage metrics and benchmarks, retention suites, midtraining decision protocol, independent release gates | `references/evaluation.md` |
 | Experiment records, optional HTML dashboards, git checkpoints, publishing an authorized report | `references/experiment-tracking.md` |
+| Implementing or launching a recipe on the NVIDIA NeMo stack: Nemotron steps and recipes (Megatron-Bridge, AutoModel, NeMo-RL), NeMo Gym environments and rollouts, Gym evaluation recipes, config key mapping, hardware sizing | `references/nemo-stack.md` |
 | Bibliography and verification status, including workflow-only sources | `references/sources.md` |
 
 ## Deliver and verify
@@ -124,3 +134,7 @@ can help larger tasks when the host permits them; they are not prerequisites.
 - `assets/templates/experiment_dashboard.html`: optional report starter.
   Copy it for a requested dashboard, edit its data block, and consult
   `references/experiment-tracking.md` for applicable reporting detail.
+- Default stack: NVIDIA-NeMo/Nemotron (`uv run nemotron steps list|show|run`,
+  `nemotron <model> <stage>`) and NVIDIA-NeMo/Gym (`gym env start`,
+  `gym eval run`). `references/nemo-stack.md` records the pinned commits its
+  facts were read from; the generic templates above serve other trainers.

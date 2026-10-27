@@ -33,6 +33,18 @@ regularizer toward the base model. Decision rule:
   collapses to 29.02** — large-scale parameter updates amplify spurious
   correlations when data is tiny. In this regime LoRA is not a memory
   hack, it *is* the regularizer; full FT needs data volume.
+- **New-language knowledge, same pack, same base: full SFT ≈3–4× the LoRA
+  gain** (Nemotron SFT guidebook `[reported — repo ablation at commit
+  1c3e781 on the pre-RL SFT checkpoint of Nemotron-3-Nano-30B-A3B]`): full
+  SFT at 1e-5 vs LoRA at 1e-4 (rates deliberately unmatched, as each is
+  actually run): Hindi MILU +8.63 vs +2.70, Malayalam MILU +15.50 vs +4.19;
+  answers written in the target script +74.9pp vs +18.6pp (Hindi math) and
+  +80.7pp vs +4.8pp (Malayalam math) — the gap widens with how unfamiliar
+  the language is, as expected if adapter capacity is the limit. LoRA's one
+  win, far less English instruction-following loss (−0.61 vs −4.08), is
+  bought back for full SFT by 20k English IF replay (post-training.md §2).
+  Confirms the decision rule above; many small revertible adapters is a
+  different question they did not test.
 
 ## 2. LoRA hyperparameters
 

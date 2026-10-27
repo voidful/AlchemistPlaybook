@@ -60,6 +60,7 @@ Incomplete logs can still support a provisional diagnosis.
 | Compute estimates | "Estimate GPU-hours from this model, dataset, and hardware budget." | Reproducible calculation with assumptions |
 | Stage evaluation | "Choose an evaluation suite for continued pretraining." | Monitoring, capability checks, and a separate release holdout |
 | Experiment records | "Summarize these runs in our existing Markdown notes." | A report in the requested format, with provenance and decision criteria |
+| Implementation on NeMo | "Turn this SFT and GRPO plan into Nemotron steps and a NeMo Gym environment config." | Step chain, config overrides with evidence labels, verification commands |
 
 For calculator options:
 
@@ -75,6 +76,12 @@ The [scaling reference](alchemist-playbook/references/scaling-and-batch.md) expl
 The entrypoint is a short task guide and reference router.
 Detailed recipes load when relevant to the question.
 The [text-LLM baseline and LR ladder](alchemist-playbook/references/text-llm-baselines.md) are a separate reference.
+
+Implementation defaults to the NVIDIA NeMo stack.
+When you have not fixed a trainer, the skill maps its recipe onto [NVIDIA-NeMo/Nemotron](https://github.com/NVIDIA-NeMo/Nemotron) steps and recipes (Megatron-Bridge, NeMo AutoModel, NeMo-RL) and [NVIDIA-NeMo/Gym](https://github.com/NVIDIA-NeMo/Gym) environments and evaluation.
+It names the config key that carries each value and the commit the value was read from.
+Your own trainer still takes precedence.
+See the [NeMo stack reference](alchemist-playbook/references/nemo-stack.md) and [decision 0007](docs/decisions/0007-nemo-stack-default-implementation.md).
 
 Each recommended training value carries an evidence label:
 

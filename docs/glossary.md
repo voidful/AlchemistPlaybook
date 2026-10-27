@@ -2,7 +2,7 @@
 type: glossary
 title: Glossary
 status: active
-updated: 2026-09-07
+updated: 2026-10-27
 ---
 
 # Glossary
@@ -49,6 +49,17 @@ for their full treatment.)
 - **LR ladder** — illustrative learning-rate anchors across training
   stages, with separate adapter-tuning regimes. It is a lookup aid, not a
   universal stage ratio. Home: the baseline reference above.
+- **NeMo stack** — NVIDIA-NeMo/Nemotron (stage recipes and the `nemotron
+  steps` catalog over Megatron-Bridge, NeMo AutoModel, and NeMo-RL) plus
+  NVIDIA-NeMo/Gym (environments, verifiers, agent harnesses, evaluation);
+  the skill's default implementation route (decision 0007). Home:
+  `references/nemo-stack.md`.
+- **NeMo Gym environment** — dataset (JSONL tasks) + agent harness +
+  verifier with per-task state + model server, wired by one YAML config;
+  the unit NeMo Gym evaluates and trains against.
+- **Nemotron step** — a named unit of work in the Nemotron repository
+  (`nemotron steps run <id>`) with declared consumed and produced artifact
+  types; steps chain by matching those types.
 - **Three-tier evaluation** — health monitoring ("is the run alive") vs
   capability evaluation ("is it getting stronger without forgetting") vs
   release gate ("can it ship" — a private holdout). Home:

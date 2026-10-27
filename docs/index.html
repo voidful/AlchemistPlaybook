@@ -280,11 +280,11 @@ const DATA = {
   repo: "https://github.com/voidful/AlchemistPlaybook",
   stats: [
     { v: "auto:sources", k: "sources in the bibliography" },
-    { v: "11", k: "routed reference files" },
+    { v: "12", k: "routed reference files" },
     { v: "8",  k: "ready-to-edit config templates" },
     { v: "15/15", k: "historical iteration-1 expectations (11/15 without skill)", up: "+4" },
     { v: "Pending", k: "new behavior cases: defined, not executed" },
-    { v: "6",  k: "decision records" },
+    { v: "7",  k: "decision records" },
     { v: "≤1024", k: "hard cap on trigger description (chars)" }
   ],
   routing: [
@@ -298,6 +298,7 @@ const DATA = {
     { topic: "Diagnostics — symptom → cause → fix, monitoring setup, pre-launch checklist", file: "diagnostics.md" },
     { topic: "Evaluation — per-stage metrics and benchmarks, three-tier framework, retention suite, midtraining decision protocol, release gate", file: "evaluation.md" },
     { topic: "Experiment records — existing trackers, optional HTML dashboards, git checkpoints, authorized publishing", file: "experiment-tracking.md" },
+    { topic: "NeMo stack — Nemotron steps and recipes, NeMo-RL, NeMo Gym environments, Gym evaluation recipes, config key map, hardware sizing", file: "nemo-stack.md" },
     { topic: "Bibliography with verification status", file: "sources.md" }
   ],
   ladder: {
@@ -337,7 +338,7 @@ const DATA = {
       { eval: "Speech warmup divergence", missed: "No named published speech recipe (OWSM v3.1 / Whisper) — generic advice only" }
     ]
   },
-  sourceAreas: ["Pretraining", "Post-training", "Speech", "Systems", "Benchmarks", "Workflow"],
+  sourceAreas: ["Pretraining", "Post-training", "Speech", "Systems", "Training stack", "Benchmarks", "Workflow"],
   sources: [
     { n: "LLaMA", id: "2302.13971", a: "Pretraining", v: "paper", u: "Per-size LRs, 4M batch, AdamW (0.9, 0.95), wd 0.1, cosine→10%" },
     { n: "Llama 2", id: "2307.09288", a: "Pretraining", v: "paper", u: "2T tokens, GQA; SFT 2e-5 / 2 epochs; RLHF structure" },
@@ -406,6 +407,11 @@ const DATA = {
     { n: "FSDP", id: "2304.11277", a: "Systems", v: "paper", u: "Sharded data parallel" },
     { n: "FlashAttention", id: "2205.14135", a: "Systems", v: "paper", u: "Attention memory/throughput" },
     { n: "Activation checkpointing", id: "1604.06174", a: "Systems", v: "paper", u: "Memory-for-compute trade" },
+    { n: "NVIDIA-NeMo/Nemotron (recipes + steps)", id: "1c3e781 · 2026-10-21", a: "Training stack", v: "config", u: "Default implementation route: stage recipes and the nemotron steps catalog on Megatron-Bridge, AutoModel, NeMo-RL; config-verified SFT / PEFT / DPO / GRPO / CPT defaults", link: "https://github.com/NVIDIA-NeMo/Nemotron" },
+    { n: "NVIDIA-NeMo/Gym (environments + eval)", id: "11c874b · v0.7.0", a: "Training stack", v: "config", u: "Environments (dataset + harness + verifier + state), 168 resource servers, token-ID capture for external harnesses, Nemotron eval reproducibility recipes", link: "https://github.com/NVIDIA-NeMo/Gym" },
+    { n: "Nemotron continued-pretraining guidebook", id: "steps/pretrain/guidebook", a: "Training stack", v: "reported", u: "Repo ablation on Nano-3-30B-A3B: 1:4 replay floor, retention not monotonic in replay, WSD early vs cosine long-run", link: "https://github.com/NVIDIA-NeMo/Nemotron/tree/main/src/nemotron/steps/pretrain/guidebook" },
+    { n: "Nemotron SFT guidebook", id: "steps/sft/guidebook", a: "Training stack", v: "reported", u: "Instruct adaptation: constant 1e-5, 50k–100k samples, 90:10 reasoning blend, English IF replay, full SFT over LoRA, language fidelity", link: "https://github.com/NVIDIA-NeMo/Nemotron/tree/main/src/nemotron/steps/sft/guidebook" },
+    { n: "Nemotron training FAQ", id: "docs/train-models/faq", a: "Training stack", v: "reported", u: "Team answers: fine-tune from the post-trained checkpoint, Super SFT 1e-5 constant, long-context CPT LRs, checkpoint merging, MoE monitoring", link: "https://github.com/NVIDIA-NeMo/Nemotron/blob/main/docs/train-models/faq/index.md" },
     { n: "MMLU / MMLU-Pro", id: "2009.03300", a: "Benchmarks", v: "paper", u: "MMLU-Pro: 10 options, better strong-model discrimination" },
     { n: "IFEval", id: "2311.07911", a: "Benchmarks", v: "paper", u: "~25 auto-verifiable instruction types; strict/loose accuracy" },
     { n: "RULER", id: "2404.06654", a: "Benchmarks", v: "paper", u: "Configurable-length long-context; > vanilla needle-in-haystack" },
@@ -435,9 +441,11 @@ const DATA = {
     { id: "0003", d: "2026-07-11", t: "HTML-artifact experiment tracking", p: "Original HTML and git reporting workflow. Unconditional format and publishing requirements are partially superseded by 0006.", f: "0003-html-artifact-experiment-tracking.md" },
     { id: "0004", d: "2026-08-19", t: "Two-road documentation", p: "Interactive HTML for humans (this page), indexed markdown for agents; six governance invariants; deterministic checker.", f: "0004-two-road-documentation.md" },
     { id: "0005", d: "2026-08-19", t: "Plugin packaging, versioned releases, tests, CI", p: "One-command Claude Code install (plugin manifests, no directory move), MIT license, CHANGELOG + version sync, stdlib test suite locking SKILL.md to estimate.py, GitHub Actions CI.", f: "0005-plugin-packaging-tests-ci.md" },
-    { id: "0006", d: "2026-09-07", t: "Task-scoped guidance and progressive disclosure", p: "Short trigger, routed baselines, context-aware intake, user-selected formats, and proportionate verification. New behavior evals await execution.", f: "0006-task-scoped-skill-guidance.md" }
+    { id: "0006", d: "2026-09-07", t: "Task-scoped guidance and progressive disclosure", p: "Short trigger, routed baselines, context-aware intake, user-selected formats, and proportionate verification. New behavior evals await execution.", f: "0006-task-scoped-skill-guidance.md" },
+    { id: "0007", d: "2026-10-27", t: "Default implementation stack: NeMo Gym + Nemotron recipes", p: "When the user has not fixed a trainer, map recipes onto NVIDIA-NeMo/Nemotron steps and recipes and NeMo Gym environments; the user's trainer still wins; repo values are [config] with pinned commits.", f: "0007-nemo-stack-default-implementation.md" }
   ],
   commits: [
+    { d: "2026-10-27", s: "Adopt the NVIDIA NeMo stack (Nemotron recipes + NeMo Gym) as the default implementation route (decision 0007): new references/nemo-stack.md; guidebook and FAQ evidence folded into pretraining, post-training, peft, evaluation" },
     { d: "2026-10-27", s: "Add Nemotron 3.5 agentic midtraining recipe (arXiv 2610.22019): 256K SWE blend, traces ≤10–15%, tool-response masking, LR/replay ablations, short-fixed-SFT decision protocol" },
     { d: "2026-08-19", s: "Add MiniCPM5-1B, OpenThoughts, GRAPE: reasoning-SFT data curation, RL length-control guardrail, 1B RL-teachers→OPD" },
     { d: "2026-08-19", s: "Add Rethinking-OPD: OPD preconditions, overlap-ratio diagnostic, cold-start recovery" },

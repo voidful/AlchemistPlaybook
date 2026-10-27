@@ -72,7 +72,7 @@ Four rules that prevent most eval mistakes:
 | Data contamination | benchmark overlap, n-gram overlap, train-set hit rate, canary extraction | **prevent inflated benchmarks**; Llama 3 ran per-benchmark contamination analysis `[paper]` |
 | Tokenizer | token/char, zh/code compression rate, UNK/abnormal-token rate, special-symbol ratio | matters most for multilingual / Chinese / code |
 | System efficiency | tokens/sec/GPU, MFU, GPU util, memory, comm time, checkpoint time, fault-recovery time | controls cost and stability (estimate.py flops for MFU targets) |
-| **MoE-specific** | expert load balance, router entropy, dropped-token rate, expert-capacity overflow | **mandatory for MoE** — collapsed routing is invisible in total loss (DeepSeek-V3 aux-loss balancing) |
+| **MoE-specific** | expert load balance, router entropy, dropped-token rate, expert-capacity overflow; Nemotron team watch-list: MaxVio (peak expert load ÷ mean; dead experts are the extreme), `params_norm`, `num_zeros` under low precision, per-head MTP losses, residual-stream norms by depth | **mandatory for MoE** — collapsed routing is invisible in total loss (DeepSeek-V3 aux-loss balancing); in Ultra 3's first divergence the MTP-2 head loss diverged before the main loss and early-layer residual norms had been rising from ≈7.5T tokens `[reported — Nemotron repo FAQ]` |
 
 Cadence: loss/grad-norm/LR/tokens/tok-s every ≤50 steps; numerical-health
 flags every step (cheap); bucketed val + scaling check every ~1000 steps
@@ -159,7 +159,9 @@ tool use. Mid-training eval by training type:
    means the model solves *more*, not just more reliably, and the paper
    reads higher pass@k as more room for RL to improve (citing Yue et al.
    2025). Compare Terminal-Bench only within a version — 2.1 fixed 28 of
-   2.0's 89 tasks.
+   2.0's 89 tasks. NeMo Gym's Nemotron reproducibility recipes are the
+   worked example of this pinning — one YAML per benchmark with the
+   published run's harness, sampling, and Gym commit (nemo-stack.md §7).
 3. Run general-capability regression groups on the *base* checkpoints
    during midtraining, against the stage input — knowledge (MMLU 5-shot +
    MMLU-Pro 5-shot CoT), math (GSM8K 8-shot + MATH 4-shot), code
@@ -192,6 +194,7 @@ tool use. Mid-training eval by training type:
 | Refusal behavior | safe-refusal rate, **benign false-refusal rate**, over-refusal |
 | Factuality | hallucination rate, unsupported-claim rate, citation-error rate |
 | Style | avg length, verbosity rate, template-ization rate, repetition rate, verbosity drift |
+| Language fidelity | share of free-form answers written in the expected language or script, per benchmark, next to accuracy — an MCQ or knowledge metric cannot see a model silently answering in another script (Nemotron-3-Nano wrote 2.5% of its Hindi math answers in Hindi while scoring 72 on Hindi MILU) `[reported — Nemotron SFT guidebook]` |
 | Tool use | tool-selection accuracy, argument accuracy, invalid-JSON rate, execution success |
 
 Watch refusal *both ways*: a model that refuses harmful prompts but also

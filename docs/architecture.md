@@ -2,7 +2,7 @@
 type: architecture
 title: Repository architecture
 status: active
-updated: 2026-09-07
+updated: 2026-10-27
 ---
 
 # Architecture
@@ -59,8 +59,9 @@ flowchart LR
    the next decision; provisional work can continue.
 3. The **routing table** maps the topic to one or more reference files
    (pretraining, post-training, stability, peft, speech, scaling-and-batch,
-   diagnostics, evaluation, experiment-tracking, sources). Text-LLM baseline
-   and cross-stage LR questions use `references/text-llm-baselines.md`.
+   diagnostics, evaluation, experiment-tracking, nemo-stack, sources).
+   Text-LLM baseline and cross-stage LR questions use
+   `references/text-llm-baselines.md`.
 4. `scripts/estimate.py` handles its supported calculations and LR lookups.
    Other calculations use explicit formulas and executable checks when
    available; an unexecuted estimate is labeled accordingly.
@@ -68,6 +69,10 @@ flowchart LR
    advice covers diagnosis, changes, evidence, and verification without
    requiring fixed headings. Config edits include relevant local validation.
    Reporting uses the existing tracker or an appropriate optional template.
+   Implementation and launch guidance defaults to the NVIDIA NeMo stack
+   (Nemotron steps and recipes, NeMo-RL, NeMo Gym) unless the user's
+   trainer is fixed
+   ([decision 0007](decisions/0007-nemo-stack-default-implementation.md)).
 
 These boundaries are recorded in
 [decision 0006](decisions/0006-task-scoped-skill-guidance.md).
@@ -81,5 +86,6 @@ These boundaries are recorded in
 | Anything under `alchemist-playbook/` | repackage `alchemist-playbook.skill` ([workflows/release.md](workflows/release.md)) |
 | Repo structure, conventions, or direction | the affected doc in `docs/` + [docs/index.md](index.md) + a decision record if directional |
 | Headline stats (source count, eval results, decisions) | the `DATA` block in [docs/index.html](index.html) |
+| A NeMo-stack fact (path, default, container, commit) | re-read the live repositories and update the pinned commits in `references/nemo-stack.md` and `references/sources.md` |
 
 `scripts/check_docs.py` verifies the mechanical rows of this table.

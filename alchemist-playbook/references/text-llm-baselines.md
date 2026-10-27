@@ -65,6 +65,11 @@ PPO/RLVR        3e-7–1e-6 (Tulu 3 PPO [config], DeepSeekMath GRPO [paper])
 LoRA/QLoRA SFT  1e-4–2e-4 (QLoRA [paper]; adapter tuning is a separate regime)
 ```
 
+The PPO/RLVR line is the dense, KL-anchored regime. The NeMo-RL GRPO
+configs in the Nemotron recipes run hybrid-MoE policies at 3e-6–4e-6 with
+KL 0, a constant schedule, weight decay 0, and frozen routers — a different
+regime, not a contradiction (post-training.md §5, nemo-stack.md §5).
+
 Use `scripts/estimate.py lr` for a lookup. Check the objective and parameter
 regime in the corresponding reference before selecting a value. An SFT LR
 above a pretrain LR warrants investigation; it does not by itself prove a

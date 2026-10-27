@@ -2,7 +2,7 @@
 type: index
 title: Documentation index
 status: active
-updated: 2026-09-07
+updated: 2026-10-27
 ---
 
 # Documentation index
@@ -51,6 +51,7 @@ links back (invariant 4).
 | [0004](decisions/0004-two-road-documentation.md) | Two-road documentation: interactive HTML for humans, indexed markdown for agents | active |
 | [0005](decisions/0005-plugin-packaging-tests-ci.md) | Plugin packaging (Claude Code + Codex manifests), MIT license, versioned releases, test suite, CI | active |
 | [0006](decisions/0006-task-scoped-skill-guidance.md) | Task-scoped guidance, progressive disclosure, flexible reporting, and proportionate verification | active |
+| [0007](decisions/0007-nemo-stack-default-implementation.md) | Default implementation stack: Nemotron recipes + NeMo-RL + NeMo Gym, with the user's trainer still taking precedence and repo values pinned to commits | active |
 
 ## Knowledge homes outside `docs/`
 
@@ -63,6 +64,7 @@ place each — never duplicate these facts into `docs/`:
 | Text-LLM consensus baseline and LR ladder | [text-llm-baselines.md](../alchemist-playbook/references/text-llm-baselines.md) |
 | Stage-specific recipes and evidence | [alchemist-playbook/references/](../alchemist-playbook/references/) (routing table in SKILL.md) |
 | Bibliography + verification status | [alchemist-playbook/references/sources.md](../alchemist-playbook/references/sources.md) |
+| NVIDIA NeMo stack mapping (Nemotron steps and recipes, NeMo-RL, NeMo Gym): entry points, config keys, pinned commits | [nemo-stack.md](../alchemist-playbook/references/nemo-stack.md) |
 | Quantitative estimation (FLOPs, Chinchilla, batch, LR ladder) | [alchemist-playbook/scripts/estimate.py](../alchemist-playbook/scripts/estimate.py) |
 | Ready-to-edit training configs + experiment dashboard | [alchemist-playbook/assets/templates/](../alchemist-playbook/assets/templates/) |
 | Eval definitions and results | [alchemist-playbook-workspace/](../alchemist-playbook-workspace/) |

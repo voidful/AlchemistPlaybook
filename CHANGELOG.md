@@ -5,6 +5,50 @@ listed separately in each entry. The version here must match
 `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`
 (locked by `tests/test_doc_consistency.py`).
 
+## 1.4.0 — NVIDIA NeMo stack as the default implementation route
+
+Skill behavior:
+
+- Adopt NVIDIA-NeMo/Nemotron (stage recipes and the `nemotron steps`
+  catalog on Megatron-Bridge, NeMo AutoModel, NeMo-RL) and NVIDIA-NeMo/Gym
+  (environments, verifiers, harnesses, evaluation) as the default
+  implementation route when the user has not fixed a trainer (decision
+  0007). The user's existing trainer still takes precedence; the skill then
+  names the NeMo equivalent only where it adds a capability.
+- New `references/nemo-stack.md`: stage → entry-point map, config-verified
+  defaults for the pretrain/CPT, SFT, PEFT, DPO, RLVR/GRPO, and RLHF steps
+  and for the Nano 3, Lightning 3.5, and Super 3 recipes, NeMo Gym
+  environment and data-format rules, multi-environment batch sizing,
+  token-ID capture for external harnesses, Gym evaluation and the Nemotron
+  reproducibility recipes, hardware routing and containers, a skill-knob →
+  config-key map, and pre-launch verification. Trigger, task handling,
+  routing table, and resources updated.
+
+Knowledge:
+
+- Fold the Nemotron repository's training evidence into the topic
+  references, marked `[reported]` with pinned commits: continued-
+  pretraining guidebook (replay floor, non-monotonic retention, WSD-early
+  vs cosine-long-run) and team FAQ (long-context CPT constant LRs,
+  checkpoint merging, mixture heuristic) in `pretraining.md`; SFT guidebook
+  (constant LR, data-volume knee, reasoning blend, instruction-following
+  regression and replay, language fidelity) and FAQ (fine-tune from the
+  post-trained checkpoint, Super SFT warmup, MoE mixture rule) in
+  `post-training.md`; full-SFT-vs-LoRA in `peft.md`; MoE monitoring
+  signals and the language-fidelity metric in `evaluation.md`; two
+  diagnostics rows; NeMo-RL GRPO defaults with an LR-regime note in
+  `post-training.md` §5 and `text-llm-baselines.md`, because the Nemotron
+  MoE GRPO configs run above the dense RL anchors.
+
+Documentation and validation:
+
+- Decision record 0007; glossary, architecture, conventions (repo-pinned
+  `[config]` rule), and index updated; dashboard DATA block (routing,
+  sources with a new "Training stack" area, decisions, timeline); README
+  mention; plugin descriptions; new workspace eval case
+  `nemo-stack-implementation` (defined, not executed); archive rebuilt;
+  version 1.4.0 in both plugin manifests.
+
 ## 1.3.0 — Nemotron 3.5 agentic midtraining recipe
 
 Knowledge:

@@ -152,6 +152,46 @@ homogeneous phase.
   21.01 vs 19.27 / 16.21 / 15.22). More replay is not automatically safer —
   it displaces target-domain tokens.
 
+**Nemotron team practice for late-stage continued pretraining, from the
+Nemotron repository** `[reported — docs/train-models/faq and
+steps/pretrain/guidebook at commit 1c3e781; team answers citing the Nano /
+Super / Ultra tech reports; implementation in nemo-stack.md §3]`:
+- *Long-context CPT phases run at small constant LRs and mix long with
+  short sequences*, because long-only training hurt short-context scores:
+  Nano 3 — constant 1e-5, GBS 48, 121B tokens, 512K mixed with 4K
+  sequences, blend 20% document QA / 1% synthetic retrieval / 79%
+  downscaled phase-2 data; Super 3 — constant 4.5e-6, GBS 16, 34B tokens at
+  1M context then 17B tokens alternating 1M and 4K; Ultra 3 — constant
+  2.5e-6, 33B tokens, 1M sequences for 92% of iterations and 4K for 8%,
+  with math/code SFT-style data only in the 4K iterations.
+- *Checkpoint merging as a free anneal readout* (Super 3): checkpoints
+  every 1,000 iterations (≈25B tokens at GBS 3,072 × 8,192), sliding merge
+  windows of 125B / 250B / 500B tokens with minus-sqrt-decay weights; in
+  the stable-LR phase the best merge beat the trained checkpoint by 2–4
+  points on a 12-benchmark average, the report estimates ≈16% of the
+  pretraining FLOP budget saved by merging instead of dedicated decay runs
+  for intermediate evaluation, and the base chosen for alignment was itself
+  a 500B-token merge; in the final 5T-token decay the decay-trained
+  checkpoints matched or beat the merges, so merging pays most on short
+  annealing horizons. Ultra widened the search to 125B–1T windows and
+  sequential / random / reversed orderings. A cousin of OLMo 2's stage-2
+  souping above and of post-training.md §8.
+- *Language CPT guidebook* (Nano-3-30B-A3B, Hindi / Malayalam / Vietnamese
+  / Punjabi; repo ablation): pilot ≈5B target tokens at **1:4
+  English:target** replay (the third replay point below); evaluate every
+  checkpoint on native quality *and* retained capability (ProX-en,
+  ARC-Challenge, HellaSwag, fixed-text BPB); **WSD leads early** (+0.26 at
+  2B, +0.78 at 5B on one target trajectory) while **cosine wins long-run
+  retention** at 10–15B tokens (ProX-en +1.59 Vietnamese / +2.23 Hindi,
+  native quality within noise) — phrased precisely as "cosine limits the
+  ProX-en loss", since ARC-C / HellaSwag / MILU-en stayed flat; native gains
+  were still rising at ≈15B, with one cosine trajectory showing a 10B cost
+  knee (+0.28 for the last 5B). Write acceptance thresholds (adaptation
+  floor, retention budget, minimum useful gain per 5B tokens) *before*
+  training; derive steps as `train_iters = target_tokens × (1 + e/(1−e)) /
+  (GBS × seq)` with `e` the English share. Transfer to larger or
+  instruction-tuned models is "not yet established" `[reported]`.
+
 **Agentic-coding midtraining — the Nemotron 3.5 open recipe** `[paper
 2610.22019, v1 2026-10-15]`. A dedicated stage between a converged
 short-context base (Nemotron pretrains at 8K and sees almost no agent
@@ -267,14 +307,19 @@ For continued-pretraining of an existing base: 10–100B tokens with a fresh
 warmup and cosine/WSD decay — or, when a long-context stage and SFT still
 follow, a short warmup to a **constant** moderate LR with no decay inside
 the stage (Nemotron 3.5 midtraining `[paper]`, 65–500B tokens) — mixing
-original-distribution replay to limit forgetting. Two controlled replay
+original-distribution replay to limit forgetting. Three controlled replay
 points: EvoLM (1B dense, 50B math CPT) says ~5–15% replay, tuned, and
 warns against reflexively going higher; Nemotron (30B-A3B / 120B-A12B MoE,
 agentic midtraining) ran **20%** with no general-capability regression
-through 65B tokens and found **40% no better** `[paper]`. The older 10–30%
-band from OLMo 2 stage-2 / Llama 3 anneal practice is the upper limit, not
-the default `[EvoLM config-verified; Nemotron paper; band remains
-heuristic]`.
+through 65B tokens and found **40% no better** `[paper]`; the Nemotron
+team's language-CPT guidebook (Nano-3-30B-A3B, four Indic languages, 5B
+target tokens) found **1:4 English:target — again 20%** — within 1.44
+points of each language's best native score at 37.5% fewer total tokens
+than 1:1, with retention *not* monotonic in the English share (33% and 50%
+recovered nothing consistently) `[reported — repo ablation]`. The older
+10–30% band from OLMo 2 stage-2 / Llama 3 anneal practice is the upper
+limit, not the default `[EvoLM config-verified; Nemotron paper; band
+remains heuristic]`.
 
 **CPT learning rate — two published regimes, not one rule.** EvoLM
 re-warmed a small dense base to its *full* pretraining peak (2e-4).
@@ -323,6 +368,18 @@ examples** by measured difficulty is a separate, composable lever — see §6.
 - Domain mixes are usually stated, rarely ablated publicly. Llama 3's final
   mix: roughly 50% general knowledge, 25% math/reasoning, 17% code, 8%
   multilingual `[paper]`.
+- The Nemotron team's stated weighting rule `[reported — Nemotron repo FAQ,
+  citing Nemotron-H and the Nano / Super / Ultra reports]`: sources of
+  similar estimated quality get similar weight and higher-quality sources
+  proportionally more; keep the whole dataset at ≤4–8 epochs (more unique
+  tokens enabled long horizons; higher epoch counts gave diminishing
+  returns); two-phase curricula switch from a diversity / coverage mix to a
+  quality-biased one late — Nano 3 at 94% of tokens, Super 3 at 80%, Ultra 3
+  at ≈75% (Nemotron-H used four phases) — and Nemotron-H measured the
+  phased order beating random ordering by 3.4% at 8B params / 1T tokens.
+  Synthetic data sits in pretraining too: rephrased high-quality crawl
+  tiers, rephrased Python, STEM and scientific-coding sets, and explicit
+  general / STEM / code SFT-style categories.
 
 ## 6. Distillation and difficulty-curriculum for small / edge models
 

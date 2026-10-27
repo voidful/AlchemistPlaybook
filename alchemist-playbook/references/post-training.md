@@ -46,6 +46,7 @@ report, `[reported]` secondary source.
 | Picking (or debugging) an OPD teacher for a single student | Check the two preconditions first (§15) | Rethinking-OPD: pattern-mismatched or same-pipeline teachers fail even when they benchmark higher — OPD is reverse KL at *student-visited* states, so the teacher must differ there |
 | Agentic RL where sparse episode rewards leave intermediate decisions unguided, and no stronger teacher exists | Self-evolving hindsight-skill OPD joint with GRPO (SEED, §17) | dense token-level signal from the policy's *own* trajectory analysis; beats GRPO on ALFWorld/WebShop/search-QA at 1.7–7B |
 | Agentic-coding post-training on a base that pretrained at short context with no agent traces; SFT keeps growing to compensate and later RL gains shrink | Insert a 256K **agentic midtraining** stage before SFT (pretraining.md §4, Nemotron 3.5) and keep SFT short | +3.8 SWE-bench Verified / +7.0 Multilingual / +3.5 Pro after identical SFT at 30B-A3B; traces capped at 10–15% of the blend so the stage does not become a long SFT; tool responses masked |
+| Any stage above when the user has not fixed a trainer, or asks how to implement, launch, or evaluate it | NVIDIA NeMo stack: Nemotron steps and recipes (Megatron-Bridge, AutoModel, NeMo-RL) + NeMo Gym environments (nemo-stack.md) | default implementation route (repo decision 0007); the recipe values above map onto its config keys (nemo-stack.md §9); the user's existing trainer still wins |
 
 ## 2. SFT recipes
 
@@ -106,6 +107,41 @@ Rules that matter more than the LR:
   controlled version. Their structural answer: move long-context and
   agent-format exposure into a midtraining stage with traces capped at
   10–15% of the blend, so SFT stays at 33–100B tokens (pretraining.md §4).
+- **Adapting an already post-trained model (Nemotron SFT guidebook)**
+  `[reported — repo ablation at commit 1c3e781, Nemotron-3-Nano-30B-A3B
+  instruct, Hindi / Malayalam persona-MCQ packs; implementation in
+  nemo-stack.md §4]`: **constant 1e-5**, chosen over cosine so that every
+  intermediate checkpoint is a comparable model (under cosine the LR at
+  step k depends on the planned total); at the same early checkpoint 1e-5 /
+  5e-6 / 3e-6 gave Hindi MILU +2.41 / +2.18 / +1.65, none destructive.
+  **50k–100k samples** split 50/50 English:target — 20k already reached
+  91% of the knowledge gain of 200k, but the reasoning-off subset must stay
+  large enough to hold mode integrity (10% of 20k = 2k samples leaked
+  reasoning in 20.1% of cases vs 4.0% at 100k) and script fidelity kept
+  climbing to 100k; beyond 100k nothing improved. Keep a **90:10
+  reasoning-on : reasoning-off** blend, never 100% on. **Replay 20k English
+  instruction-following samples** in the pack: knowledge and math hold
+  either way, but instruction following regressed on every run (IndicIFEval
+  English −12.2 → −8.4 with replay on the released checkpoint) and replay
+  buys back only part of it — the capability was installed by RL, not SFT;
+  on the pre-RL internal SFT checkpoint the same replay repairs it to
+  within noise. Planning rule: **starting from an RL-trained checkpoint,
+  budget an RL stage after SFT.** Replay had a measured cost on open-ended
+  target-language generation (IndiVibe 75.9 → 49.1), so evaluate both arms.
+  Report **language fidelity** — the share of free-form answers in the
+  expected script — next to accuracy (evaluation.md §5). Full SFT, not
+  LoRA, for new-language knowledge (peft.md §1).
+- **Nemotron team SFT answers** `[reported — Nemotron repo FAQ]`: fine-tune
+  from the post-trained checkpoint unless you intend to re-run the official
+  post-training stages (a domain fine-tune alone does not recover what
+  post-training added); Super 3's published full SFT runs **1e-5 constant
+  after a 30,000-sample linear warmup**, 1/45 of its 4.5e-4 pretraining
+  peak — convert warmup to tokens and compare with the dataset, because a
+  warmup of billions of tokens on a dataset far below tens of billions is
+  mostly warmup and overfits; narrow-domain SFT on an MoE should keep the
+  mixture close to the official post-training blend (take a slice from
+  every other domain and reassign it to the new one) to reduce
+  expert-collapse risk — a mixture strategy, not a guarantee.
 - **Scale SFT hyperparameters with dataset size, not just model size.**
   OpenThoughts' scale-dependent ladder `[paper — App. D Table 9]`, used
   across their 1000+ reasoning-SFT runs on a 7B: <1K samples → LR 1e-5, batch 32, 13 epochs;
@@ -306,6 +342,26 @@ format violations, ≈15% faster per trajectory). Single seed, 20 steps —
 **not** evidence that midtraining raises RL headroom, and the authors say
 so.
 
+**NeMo-RL GRPO as shipped for Nemotron models** `[config — NVIDIA-NeMo/Nemotron
+recipe configs at commit 1c3e781; full tables in nemo-stack.md §5]`: the Nano 3 / Lightning 3.5 / Super 3 recipes run GRPO with **KL 0**,
+a **constant LR of 3e-6 / 4e-6 / 3e-6** after a 10-iteration warmup, Adam
+(0.9, 0.999) ε 1e-8, **weight decay 0**, clip 1.0, asymmetric clip 0.2 /
+0.28, leave-one-out baseline, normalized rewards, token-level loss,
+importance-sampling correction (truncated IS ratio 5), 16 generations per
+prompt at 128 / 512 / 256 prompts per step (GBS 2,048 / 8,192 / 4,096),
+sequence lengths 49,152 / 73,728 / 49,152→65,536, `overlong_filtering`
+**off**, and MoE hygiene that protects rollout-vs-trainer logprob
+agreement — router **frozen**, router dtype fp32, load balancing "none",
+aux-loss 0 (the config notes that sequence aux-loss "causes logprob error
+divergence for grpo"); Lightning keeps 5 repeated MTP layers training at
+loss scale 0.3. These LRs sit **above** the dense 3e-7–1e-6 PPO/GRPO
+anchors in text-llm-baselines.md §3: hybrid-MoE policies, no KL anchor,
+constant schedule — read the regime before transferring either way.
+Multi-environment RLVR is their default — 6 Gym environments for Nano and
+Lightning, 21 for Super — because "single-environment training leads to
+severe regressions on other benchmarks" `[reported]`; Super's RLHF stage is
+the one place KL is non-zero (1e-4, LR 1e-6, GenRM reward).
+
 RL guardrails: monitor KL to reference, mean reward, and response length
 together — reward↑ + KL↑ + length↑ is the hacking signature. Penalize
 missing EOS (Tulu 3's −10) to prevent run-on generations.
@@ -340,6 +396,8 @@ README), nor is the repetition-penalty coefficient.
 | Multi-domain agent SFT regresses IF / general QA | conflicting reasoning patterns in one SFT mix (single-turn long-thinking vs multi-turn tool-use) | domain teachers + multi-teacher OPD (§13, Agents-A1) |
 | OPD loss falls but student benchmarks flat despite a stronger teacher | teacher fails an OPD precondition: thinking-pattern mismatch, or same-pipeline teacher with nothing new at student-visited states | check top-k overlap ratio + entropy gap; swap teacher, or off-policy cold start + teacher-aligned prompts (§15, Rethinking-OPD) |
 | Coding agent fills the context window or hits turn caps; longer SFT barely moves SWE-bench | base pretrained at short context with no agent traces — SFT alone cannot supply repository-scale context use | 256K agentic midtraining with masked tool responses before SFT (pretraining.md §4): SWE-bench Pro context-fill failures 4.1% → 0.6%, turn-cap hits 11 → 1, Verified +3.8 after identical SFT |
+| GRPO on an MoE: rollout-vs-trainer logprob error grows, run destabilizes | sequence-level aux-loss load balancing active during RL shifts routing between inference and training | freeze the router, fp32 router dtype, load balancing "none", aux-loss 0 (Nemotron NeMo-RL configs, nemo-stack.md §5); keep importance-sampling correction on |
+| Instruction following drops after domain or language SFT of an instruct model, and replay does not recover it | the capability was installed by RL, not SFT — SFT replay cannot put it back | budget an RL stage after SFT; replay still protects knowledge and math (Nemotron SFT guidebook, §2) |
 
 ## 7. Evaluation discipline
 
